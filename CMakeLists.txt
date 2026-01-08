@@ -236,7 +236,8 @@ if (PROCESSOR.AARCH64)
     )
 endif ()
 
-if (PROCESSOR.X86_64)
+# x64 ASM files only work on Darwin (macOS) due to assembly syntax differences
+if (PROCESSOR.X86_64 AND SYSTEM.Darwin)
   set(dobby.SOURCE_FILE_LIST ${dobby.SOURCE_FILE_LIST}
     source/TrampolineBridge/ClosureTrampolineBridge/x64/closure_bridge_x64.asm
     source/TrampolineBridge/ClosureTrampolineBridge/x64/closure_trampoline_x64.asm
