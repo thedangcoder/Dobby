@@ -74,7 +74,7 @@ struct InterceptRouting {
       plugin->GenerateTrampolineBuffer(this, from, to);
     }
 
-    if (g_enable_near_trampoline) {
+    if (is_near_trampoline_enabled()) {
       near_trampoline = GenerateNearTrampolineBuffer(from, to);
     }
 

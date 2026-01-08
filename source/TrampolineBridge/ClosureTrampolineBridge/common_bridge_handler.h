@@ -1,13 +1,22 @@
 #pragma once
 
 #include "dobby/dobby_internal.h"
+#include "dobby/platform_mutex.h"
 
 #include "Interceptor.h"
 #include "TrampolineBridge/ClosureTrampolineBridge/ClosureTrampoline.h"
 
 inline asm_func_t closure_bridge_addr = nullptr;
+inline DobbyMutex closure_bridge_mutex;
 
-void closure_bridge_init();
+void closure_bridge_init_impl();
+
+inline void closure_bridge_init() {
+  DobbyLockGuard lock(closure_bridge_mutex);
+  if (!closure_bridge_addr) {
+    closure_bridge_init_impl();
+  }
+}
 
 void get_routing_bridge_next_hop(DobbyRegisterContext *ctx, void *address);
 

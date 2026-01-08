@@ -13,7 +13,7 @@ using namespace zz::arm64;
 
 extern "C" void closure_bridge_asm();
 
-void closure_bridge_init() {
+void closure_bridge_init_impl() {
   __FUNC_CALL_TRACE__();
 
 #if !defined(BUILD_WITH_TRAMPOLINE_ASSEMBLER) || defined(BUILD_WITH_TRAMPOLINE_ASM)

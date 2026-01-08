@@ -2,6 +2,7 @@
 
 #include "common/linear_allocator.h"
 #include "PlatformUnifiedInterface/platform.h"
+#include "dobby/platform_mutex.h"
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define max(a, b) (((a) > (b)) ? (a) : (b))
@@ -59,6 +60,7 @@ using CodeMemBlock = MemBlock;
 using DataMemBlock = MemBlock;
 
 struct MemoryAllocator {
+  mutable DobbyMutex mutex;
   stl::vector<simple_linear_allocator_t *> code_page_allocators;
   stl::vector<simple_linear_allocator_t *> data_page_allocators;
 
@@ -74,13 +76,15 @@ struct MemoryAllocator {
   }
 
   MemBlock allocMemBlock(size_t in_size, bool is_exec = true) {
+    DobbyLockGuard lock(mutex);
+
     if (in_size > OSMemory::PageSize()) {
       ERROR_LOG("alloc size too large: %d", in_size);
       return {};
     }
 
     uint8_t *result = nullptr;
-    auto allocators = is_exec ? code_page_allocators : data_page_allocators;
+    auto &allocators = is_exec ? code_page_allocators : data_page_allocators;
     for (auto allocator : allocators) {
       result = (uint8_t *)allocator->alloc(in_size);
       if (result)

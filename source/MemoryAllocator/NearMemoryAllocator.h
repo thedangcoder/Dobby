@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dobby/common.h"
+#include "dobby/platform_mutex.h"
 #include "MemoryAllocator.h"
 #include "PlatformUtil/ProcessRuntime.h"
 #include <stdint.h>
@@ -39,29 +40,33 @@ PUBLIC inline void dobby_register_alloc_near_code_callback(dobby_alloc_near_code
 }
 
 struct NearMemoryAllocator {
+  mutable DobbyMutex mutex;
   stl::vector<simple_linear_allocator_t*> code_page_allocators;
   stl::vector<simple_linear_allocator_t*> data_page_allocators;
 
   inline static NearMemoryAllocator *Shared();
 
   MemBlock allocNearCodeBlock(uint32_t in_size, addr_t pos, size_t range) {
+    DobbyLockGuard lock(mutex);
     if (custom_alloc_near_code_handler) {
       auto addr = custom_alloc_near_code_handler(in_size, pos, range);
       if (addr)
         return {addr, in_size};
     } else {
       auto search_range = MemRange(pos - range, range * 2);
-      return allocNearBlock(in_size, search_range, true);
+      return allocNearBlock_unlocked(in_size, search_range, true);
     }
     return {};
   }
 
   MemBlock allocNearDataBlock(uint32_t in_size, addr_t pos, size_t range) {
+    DobbyLockGuard lock(mutex);
     auto search_range = MemRange(pos - range, range * 2);
-    return allocNearBlock(in_size, search_range, false);
+    return allocNearBlock_unlocked(in_size, search_range, false);
   }
 
-  MemBlock allocNearBlock(uint32_t in_size, MemRange search_range, bool is_exec = true) {
+private:
+  MemBlock allocNearBlock_unlocked(uint32_t in_size, MemRange search_range, bool is_exec = true) {
     // step-1: search from allocators first
     auto allocators = is_exec ? code_page_allocators : data_page_allocators;
     for (auto allocator : allocators) {
@@ -113,7 +118,7 @@ struct NearMemoryAllocator {
           data_page_allocators.push_back(page_allocator);
       }
       // should be fallthrough to step-1 allocator
-      return allocNearBlock(in_size, search_range, is_exec);
+      return allocNearBlock_unlocked(in_size, search_range, is_exec);
     }
 
     // step-3 for exec only

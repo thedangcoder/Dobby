@@ -14,7 +14,7 @@ using namespace zz::x64;
 extern "C" void closure_bridge_asm();
 #endif
 
-void closure_bridge_init() {
+void closure_bridge_init_impl() {
   __FUNC_CALL_TRACE__();
 
 // Check if enable the inline-assembly closure_bridge_template

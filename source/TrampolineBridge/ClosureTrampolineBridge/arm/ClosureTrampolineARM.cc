@@ -11,8 +11,6 @@
 using namespace zz;
 using namespace zz::arm;
 
-extern void closure_bridge_init();
-extern asm_func_t closure_bridge_addr;
 extern asm_func_t get_closure_bridge_addr();
 
 ClosureTrampoline *GenerateClosureTrampoline(void *carry_data, void *carry_handler) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dobby/common.h"
+#include "dobby/platform_mutex.h"
 #include "MemoryAllocator/MemoryAllocator.h"
 
 #include "TrampolineBridge/Trampoline/Trampoline.h"
@@ -9,6 +10,7 @@ typedef enum { kFunctionInlineHook, kInstructionInstrument } InterceptRoutingTyp
 
 struct InterceptRouting;
 struct Interceptor {
+  mutable DobbyMutex mutex;
   struct Entry {
     uint32_t id = 0;
 
@@ -71,6 +73,33 @@ struct Interceptor {
   static Interceptor *Shared();
 
   Entry *find(addr_t addr) {
+    DobbyLockGuard lock(mutex);
+    return find_unlocked(addr);
+  }
+
+  Entry *remove(addr_t addr) {
+    DobbyLockGuard lock(mutex);
+    return remove_unlocked(addr);
+  }
+
+  void add(Entry *entry) {
+    DobbyLockGuard lock(mutex);
+    entries.push_back(entry);
+  }
+
+  const Entry *get(int i) {
+    DobbyLockGuard lock(mutex);
+    return entries[i];
+  }
+
+  int count() const {
+    DobbyLockGuard lock(mutex);
+    return entries.size();
+  }
+
+private:
+  // Unlocked versions for internal use when lock is already held
+  Entry *find_unlocked(addr_t addr) {
     for (auto *entry : entries) {
       if (entry->patched.addr() == addr) {
         return entry;
@@ -79,7 +108,7 @@ struct Interceptor {
     return nullptr;
   }
 
-  Entry *remove(addr_t addr) {
+  Entry *remove_unlocked(addr_t addr) {
     for (auto iter = entries.begin(); iter != entries.end(); iter++) {
       Entry *entry = *iter;
       if (entry->patched.addr() == addr) {
@@ -88,18 +117,6 @@ struct Interceptor {
       }
     }
     return nullptr;
-  }
-
-  void add(Entry *entry) {
-    entries.push_back(entry);
-  }
-
-  const Entry *get(int i) {
-    return entries[i];
-  }
-
-  int count() const {
-    return entries.size();
   }
 };
 

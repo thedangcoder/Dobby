@@ -10,12 +10,7 @@
 using namespace zz;
 using namespace zz::arm;
 
-static asm_func_t closure_bridge = nullptr;
-
-void closure_bridge_init() {
-  // if already initialized, just return.
-  if (closure_bridge)
-    return;
+void closure_bridge_init_impl() {
 
 #define _ turbo_assembler_.
   TurboAssembler turbo_assembler_(0);
@@ -73,17 +68,15 @@ void closure_bridge_init() {
   _ mov(pc, Operand(r12));
 
   auto code = AssemblerCodeBuilder::FinalizeFromTurboAssembler(static_cast<AssemblerBase *>(&turbo_assembler_));
-  closure_bridge = (asm_func_t)code.addr();
+  closure_bridge_addr = (asm_func_t)code.addr();
 
-  DEBUG_LOG("[closure bridge] closure bridge at %p", closure_bridge);
+  DEBUG_LOG("[closure bridge] closure bridge at %p", closure_bridge_addr);
 #undef _
 }
 
 asm_func_t get_closure_bridge_addr() {
-  if (!closure_bridge) {
-    closure_bridge_init();
-  }
-  return closure_bridge;
+  closure_bridge_init();
+  return closure_bridge_addr;
 }
 
 #endif
