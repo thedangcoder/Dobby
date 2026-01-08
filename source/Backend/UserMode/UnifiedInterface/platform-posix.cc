@@ -183,3 +183,20 @@ void OSPrint::VPrint(const char *format, va_list args) {
   vprintf(format, args);
 #endif
 }
+
+// Implementation for features::android::make_memory_readable
+namespace features {
+namespace android {
+void make_memory_readable(void *address, size_t size) {
+#if defined(ANDROID)
+  auto page = (void *)ALIGN_FLOOR(address, OSMemory::PageSize());
+  if (!OSMemory::SetPermission(page, OSMemory::PageSize(), kReadExecute)) {
+    return;
+  }
+#else
+  (void)address;
+  (void)size;
+#endif
+}
+} // namespace android
+} // namespace features

@@ -9,33 +9,41 @@
 
 #include "InstructionRelocation/arm/InstructionRelocationARM.h"
 #include "MemoryAllocator/NearMemoryAllocator.h"
-#include "InterceptRouting/RoutingPlugin/RoutingPlugin.h"
+#include "InterceptRouting/RoutingPlugin.h"
 
 using namespace zz::arm;
 
-static CodeMemBuffer *generate_arm_trampoline(addr32_t from, addr32_t to) {
+static Trampoline *generate_arm_trampoline(addr32_t from, addr32_t to) {
   TurboAssembler turbo_assembler_((void *)from);
 #define _ turbo_assembler_.
 
   CodeGen codegen(&turbo_assembler_);
   codegen.LiteralLdrBranch(to);
 
-  return turbo_assembler_.code_buffer()->Copy();
+  _ relocDataLabels();
+
+  auto tramp_buffer = turbo_assembler_.code_buffer();
+  auto tramp_block = tramp_buffer->dup();
+  return new Trampoline(TRAMPOLINE_UNKNOWN, tramp_block);
 }
 
-CodeMemBuffer *generate_thumb_trampoline(addr32_t from, addr32_t to) {
+static Trampoline *generate_thumb_trampoline(addr32_t from, addr32_t to) {
   ThumbTurboAssembler thumb_turbo_assembler_((void *)from);
 #undef _
 #define _ thumb_turbo_assembler_.
 
   _ AlignThumbNop();
   _ t2_ldr(pc, MemOperand(pc, 0));
-  _ EmitAddress(to);
+  _ EmitThumbAddress(to);
 
-  return thumb_turbo_assembler_.code_buffer()->Copy();
+  _ relocThumbDataLabels();
+
+  auto tramp_buffer = thumb_turbo_assembler_.code_buffer();
+  auto tramp_block = tramp_buffer->dup();
+  return new Trampoline(TRAMPOLINE_UNKNOWN, tramp_block);
 }
 
-CodeMemBuffer *GenerateNormalTrampolineBuffer(addr_t from, addr_t to) {
+Trampoline *GenerateNormalTrampolineBuffer(addr_t from, addr_t to) {
   enum ExecuteState { ARMExecuteState, ThumbExecuteState };
 
   // set instruction running state
@@ -55,7 +63,7 @@ CodeMemBuffer *GenerateNormalTrampolineBuffer(addr_t from, addr_t to) {
   return NULL;
 }
 
-CodeMemBuffer *GenerateNearTrampolineBuffer(InterceptRouting *routing, addr_t src, addr_t dst) {
+Trampoline *GenerateNearTrampolineBuffer(addr_t src, addr_t dst) {
   return NULL;
 }
 

@@ -61,6 +61,13 @@ struct RelocDataLabel : PseudoLabel {
     data_size_ = sizeof(T);
   }
 
+  template <typename T> static RelocDataLabel *withData(T value) {
+    auto label = new RelocDataLabel();
+    *(T *)label->data_ = value;
+    label->data_size_ = sizeof(T);
+    return label;
+  }
+
   template <typename T> T data() {
     return *(T *)data_;
   }

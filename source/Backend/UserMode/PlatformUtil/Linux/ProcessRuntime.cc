@@ -14,7 +14,7 @@
 #define LINE_MAX 2048
 
 static bool memory_region_comparator(MemRange a, MemRange b) {
-  return (a.start < b.start);
+  return (a.start() < b.start());
 }
 
 stl::vector<MemRegion> regions;
@@ -163,7 +163,7 @@ static stl::vector<RuntimeModule> &get_process_map_with_proc_maps() {
       path_buffer[strlen(path_buffer) - 1] = 0;
     }
     strncpy(module.path, path_buffer, sizeof(module.path) - 1);
-    module.load_address = (void *)region_start;
+    module.base = (void *)region_start;
     modules->push_back(module);
 
 #if 0
@@ -191,11 +191,11 @@ static stl::vector<RuntimeModule> get_process_map_with_linker_iterator() {
         if (info->dlpi_name && info->dlpi_name[0] == '/')
           strcpy(module.path, info->dlpi_name);
 
-        module.load_address = (void *)info->dlpi_addr;
+        module.base = (void *)info->dlpi_addr;
         for (size_t i = 0; i < info->dlpi_phnum; ++i) {
           if (info->dlpi_phdr[i].p_type == PT_LOAD) {
             uintptr_t load_bias = (info->dlpi_phdr[i].p_vaddr - info->dlpi_phdr[i].p_offset);
-            module.load_address = (void *)((addr_t)module.load_address + load_bias);
+            module.base = (void *)((addr_t)module.base + load_bias);
             break;
           }
         }

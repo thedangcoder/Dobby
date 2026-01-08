@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include "pac_kit.h"
 
-#include "PlatformUnifiedInterface/platform.h"
-
 #if defined(__arm64e__) && __has_feature(ptrauth_calls)
 #include <ptrauth.h>
 #endif
@@ -34,13 +32,8 @@ template <typename T> inline T arm64e_pac_strip_and_sign(T &addr) {
 } // namespace apple
 
 namespace android {
-inline void make_memory_readable(void *address, size_t size) {
-#if defined(ANDROID)
-  auto page = (void *)ALIGN_FLOOR(address, OSMemory::PageSize());
-  if (!OSMemory::SetPermission(page, OSMemory::PageSize(), kReadExecute)) {
-    return;
-  }
-#endif
-}
+// Note: make_memory_readable requires OSMemory which creates circular dependency
+// Implementation moved to where OSMemory is available
+void make_memory_readable(void *address, size_t size);
 } // namespace android
 } // namespace features

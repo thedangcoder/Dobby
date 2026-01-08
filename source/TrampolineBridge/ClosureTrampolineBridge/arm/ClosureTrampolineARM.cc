@@ -6,21 +6,20 @@
 #include "core/assembler/assembler-arm.h"
 
 #include "TrampolineBridge/ClosureTrampolineBridge/ClosureTrampoline.h"
+#include "TrampolineBridge/ClosureTrampolineBridge/common_bridge_handler.h"
 
 using namespace zz;
 using namespace zz::arm;
 
-ClosureTrampolineEntry *ClosureTrampoline::CreateClosureTrampoline(void *carry_data, void *carry_handler) {
-  ClosureTrampolineEntry *tramp_entry = nullptr;
-  tramp_entry = new ClosureTrampolineEntry;
+extern void closure_bridge_init();
+extern asm_func_t closure_bridge_addr;
+extern asm_func_t get_closure_bridge_addr();
 
-#ifdef ENABLE_CLOSURE_TRAMPOLINE_TEMPLATE
-#define CLOSURE_TRAMPOLINE_SIZE (7 * 4)
-  // use closure trampoline template code, find the executable memory and patch it.
-  auto code = AssemblyCodeBuilder::FinalizeCodeFromAddress(closure_trampoline_template, CLOSURE_TRAMPOLINE_SIZE);
-#else
-// use assembler and codegen modules instead of template_code
-#include "TrampolineBridge/ClosureTrampolineBridge/ClosureTrampoline.h"
+ClosureTrampoline *GenerateClosureTrampoline(void *carry_data, void *carry_handler) {
+  if (!closure_bridge_addr) {
+    closure_bridge_init();
+  }
+
 #define _ turbo_assembler_.
   TurboAssembler turbo_assembler_(0);
 
@@ -30,20 +29,23 @@ ClosureTrampolineEntry *ClosureTrampoline::CreateClosureTrampoline(void *carry_d
   _ Ldr(r12, &entry_label);
   _ Ldr(pc, &forward_bridge_label);
   _ bindLabel(&entry_label);
-  _ EmitAddress((uint32_t)(uintptr_t)tramp_entry);
+  _ EmitAddress((uint32_t)(uintptr_t)0); // placeholder for closure_tramp pointer
   _ bindLabel(&forward_bridge_label);
   _ EmitAddress((uint32_t)(uintptr_t)get_closure_bridge_addr());
 
-  auto closure_tramp = AssemblyCodeBuilder::FinalizeFromTurboAssembler(&turbo_assembler_);
-  tramp_entry->address = (void *)closure_tramp->addr;
-  tramp_entry->size = closure_tramp->size;
-  tramp_entry->carry_data = carry_data;
-  tramp_entry->carry_handler = carry_handler;
+  auto tramp_block = AssemblerCodeBuilder::FinalizeFromTurboAssembler(static_cast<AssemblerBase *>(&turbo_assembler_));
 
-  delete closure_tramp;
+  auto closure_tramp = new ClosureTrampoline(CLOSURE_TRAMPOLINE_ARM, tramp_block, carry_data, carry_handler);
 
-  return tramp_entry;
-#endif
+  // Patch the entry_label data to point to closure_tramp
+  const uint32_t entry_label_off = 2 * 4; // after 2 instructions
+  uint32_t *entry_addr = (uint32_t *)((addr_t)tramp_block.addr() + entry_label_off);
+  *entry_addr = (uint32_t)(uintptr_t)closure_tramp;
+  ClearCache((void *)tramp_block.addr(), (void *)(tramp_block.addr() + tramp_block.size));
+
+  DEBUG_LOG("[closure trampoline] closure trampoline addr: %p, size: %d", closure_tramp->addr(), closure_tramp->size());
+  return closure_tramp;
+#undef _
 }
 
 #endif

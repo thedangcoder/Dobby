@@ -170,7 +170,7 @@ void *resolve_elf_internal_symbol(const char *library_name, const char *symbol_n
   if (library_name) {
     RuntimeModule module = ProcessRuntime::getModule(library_name);
 
-    if (module.load_address) {
+    if (module.base) {
       auto mmapFileMng = MmapFileManager(module.path);
       auto file_mem = mmapFileMng.map();
 
@@ -182,7 +182,7 @@ void *resolve_elf_internal_symbol(const char *library_name, const char *symbol_n
       }
 
       if (result)
-        result = (void *)((addr_t)result + (addr_t)module.load_address - ((addr_t)file_mem - (addr_t)ctx.load_bias));
+        result = (void *)((addr_t)result + (addr_t)module.base - ((addr_t)file_mem - (addr_t)ctx.load_bias));
     }
   }
 
@@ -190,7 +190,7 @@ void *resolve_elf_internal_symbol(const char *library_name, const char *symbol_n
     auto ProcessModuleMap = ProcessRuntime::getModuleMap();
     for (auto module : ProcessModuleMap) {
 
-      if (module.load_address) {
+      if (module.base) {
         auto mmapFileMng = MmapFileManager(module.path);
         auto file_mem = mmapFileMng.map();
 
@@ -202,7 +202,7 @@ void *resolve_elf_internal_symbol(const char *library_name, const char *symbol_n
         }
 
         if (result)
-          result = (void *)((addr_t)result + (addr_t)module.load_address - ((addr_t)file_mem - (addr_t)ctx.load_bias));
+          result = (void *)((addr_t)result + (addr_t)module.base - ((addr_t)file_mem - (addr_t)ctx.load_bias));
       }
 
       if (result)

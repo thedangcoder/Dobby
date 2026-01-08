@@ -2,6 +2,11 @@
 
 #include "dobby/common.h"
 #include "MemoryAllocator.h"
+
+#if defined(TARGET_ARCH_ARM)
+#include "core/arch/arm/constants-arm.h"
+#endif
+
 struct MemBuffer {
   uint8_t *buffer;
   uint32_t buffer_size;

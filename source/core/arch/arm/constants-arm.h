@@ -1,6 +1,13 @@
 #ifndef CORE_ARCH_CONSTANTS_ARM_H
 #define CORE_ARCH_CONSTANTS_ARM_H
 
+#include <stdint.h>
+
+// ARM instruction types
+typedef uint32_t arm_inst_t;
+typedef uint16_t thumb1_inst_t;
+typedef uint32_t thumb2_inst_t;
+
 enum AddrMode { Offset = 0, PreIndex = 1, PostIndex = 2 };
 
 enum Condition {
