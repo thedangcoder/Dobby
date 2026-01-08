@@ -6,39 +6,55 @@
 #include "core/assembler/assembler-ia32.h"
 
 #include "TrampolineBridge/ClosureTrampolineBridge/ClosureTrampoline.h"
+#include "TrampolineBridge/ClosureTrampolineBridge/common_bridge_handler.h"
 
 using namespace zz;
 using namespace zz::x86;
 
-ClosureTrampolineEntry *ClosureTrampoline::CreateClosureTrampoline(void *carry_data, void *carry_handler) {
-  ClosureTrampolineEntry *tramp_entry = nullptr;
-  tramp_entry = new ClosureTrampolineEntry;
+extern asm_func_t get_closure_bridge_addr();
 
-  auto tramp_size = 32;
-  auto tramp_mem = MemoryAllocator::SharedAllocator()->allocateExecMemory(tramp_size);
-  if (tramp_mem == nullptr) {
+ClosureTrampoline *GenerateClosureTrampoline(void *carry_data, void *carry_handler) {
+#define _ turbo_assembler_.
+  TurboAssembler turbo_assembler_(0);
+
+  // placeholder for closure_tramp pointer - will be patched later
+  _ sub(esp, Immediate(4, 32));
+  _ mov(Address(esp, 4 * 0), Immediate(0, 32)); // placeholder
+  _ jmp(Immediate(0, 32)); // placeholder for relative jump
+
+  _ relocDataLabels();
+
+  auto tramp_buffer = turbo_assembler_.code_buffer();
+  auto tramp_block = tramp_buffer->dup();
+
+  // Allocate executable memory and copy
+  auto exec_block = MemoryAllocator::Shared()->allocExecBlock(tramp_block.size + 16);
+  if (exec_block.addr() == 0) {
     return nullptr;
   }
+  memcpy((void *)exec_block.addr(), (void *)tramp_block.addr(), tramp_block.size);
 
-#define _ turbo_assembler_.
-#define __ turbo_assembler_.code_buffer()->
-  TurboAssembler turbo_assembler_(tramp_mem);
+  auto closure_tramp = new ClosureTrampoline(TRAMPOLINE_UNKNOWN, exec_block, carry_data, carry_handler);
 
-  int32_t offset = (int32_t)((uintptr_t)get_closure_bridge_addr() - ((uintptr_t)tramp_mem + 18));
+  // Patch the mov immediate with closure_tramp pointer
+  // mov [esp], imm32 is encoded as: C7 04 24 <imm32>
+  // sub esp, 4 is 3 bytes, so mov starts at offset 3
+  const uint32_t mov_imm_off = 3 + 3; // sub(3) + mov opcode(3)
+  uint32_t *mov_imm_addr = (uint32_t *)((addr_t)exec_block.addr() + mov_imm_off);
+  *mov_imm_addr = (uint32_t)(uintptr_t)closure_tramp;
 
-  _ sub(esp, Immediate(4, 32));
-  _ mov(Address(esp, 4 * 0), Immediate((int32_t)(uintptr_t)tramp_entry, 32));
-  _ jmp(Immediate(offset, 32));
+  // Patch the jmp relative offset
+  // jmp rel32 is at offset 3 + 7 = 10 (sub + mov)
+  const uint32_t jmp_off = 3 + 7; // sub(3) + mov(7)
+  int32_t *jmp_rel_addr = (int32_t *)((addr_t)exec_block.addr() + jmp_off + 1); // +1 for opcode
+  addr_t jmp_next_ip = exec_block.addr() + jmp_off + 5; // ip after jmp instruction
+  *jmp_rel_addr = (int32_t)((addr_t)get_closure_bridge_addr() - jmp_next_ip);
 
-  tramp_entry->address = tramp_mem;
-  tramp_entry->size = tramp_size;
-  tramp_entry->carry_data = carry_data;
-  tramp_entry->carry_handler = carry_handler;
+  ClearCache((void *)exec_block.addr(), (void *)(exec_block.addr() + exec_block.size));
 
-  auto closure_tramp_buffer = static_cast<CodeMemBuffer *>(turbo_assembler_.code_buffer());
-  DobbyCodePatch(tramp_mem, (uint8_t *)closure_tramp_buffer->GetBuffer(), closure_tramp_buffer->GetBufferSize());
-
-  return tramp_entry;
+  DEBUG_LOG("[closure trampoline] closure trampoline addr: %p, size: %d", closure_tramp->addr(), closure_tramp->size());
+  return closure_tramp;
+#undef _
 }
 
 #endif
