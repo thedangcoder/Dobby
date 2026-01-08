@@ -11,6 +11,7 @@ typedef enum { kFunctionInlineHook, kInstructionInstrument } InterceptRoutingTyp
 struct InterceptRouting;
 struct Interceptor {
   mutable DobbyMutex mutex;
+
   struct Entry {
     uint32_t id = 0;
 
@@ -68,55 +69,42 @@ struct Interceptor {
     }
   };
 
-  stl::vector<Entry *> entries;
+  // Use hash map for O(1) lookup instead of O(n) linear search
+  stl::unordered_map<addr_t, Entry *> entries_map;
 
   static Interceptor *Shared();
 
+  // O(1) lookup by address
   Entry *find(addr_t addr) {
     DobbyLockGuard lock(mutex);
-    return find_unlocked(addr);
+    auto it = entries_map.find(addr);
+    if (it != entries_map.end()) {
+      return it->second;
+    }
+    return nullptr;
   }
 
+  // O(1) removal by address
   Entry *remove(addr_t addr) {
     DobbyLockGuard lock(mutex);
-    return remove_unlocked(addr);
+    auto it = entries_map.find(addr);
+    if (it != entries_map.end()) {
+      Entry *entry = it->second;
+      entries_map.erase(it);
+      return entry;
+    }
+    return nullptr;
   }
 
+  // O(1) insertion
   void add(Entry *entry) {
     DobbyLockGuard lock(mutex);
-    entries.push_back(entry);
-  }
-
-  const Entry *get(int i) {
-    DobbyLockGuard lock(mutex);
-    return entries[i];
+    entries_map.insert(stl::pair<addr_t, Entry *>(entry->addr, entry));
   }
 
   int count() const {
     DobbyLockGuard lock(mutex);
-    return entries.size();
-  }
-
-private:
-  // Unlocked versions for internal use when lock is already held
-  Entry *find_unlocked(addr_t addr) {
-    for (auto *entry : entries) {
-      if (entry->patched.addr() == addr) {
-        return entry;
-      }
-    }
-    return nullptr;
-  }
-
-  Entry *remove_unlocked(addr_t addr) {
-    for (auto iter = entries.begin(); iter != entries.end(); iter++) {
-      Entry *entry = *iter;
-      if (entry->patched.addr() == addr) {
-        entries.erase(iter);
-        return entry;
-      }
-    }
-    return nullptr;
+    return entries_map.size();
   }
 };
 
