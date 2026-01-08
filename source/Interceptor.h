@@ -25,15 +25,25 @@ struct Interceptor {
     MemBlock patched;
     MemBlock relocated;
 
-    InterceptRouting *routing;
+    InterceptRouting *routing = nullptr;
 
-    uint8_t *origin_code_ = 0;
+    uint8_t *origin_code_ = nullptr;
 
     Entry(addr_t addr) {
       this->addr = addr;
     }
 
     ~Entry() {
+      if (routing) {
+        delete routing;
+        routing = nullptr;
+      }
+      // Note: origin_code_ is freed in restore_orig_code() if called,
+      // but we should clean up if not restored
+      if (origin_code_) {
+        operator delete(origin_code_);
+        origin_code_ = nullptr;
+      }
     }
 
     void backup_orig_code() {

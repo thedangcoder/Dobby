@@ -29,8 +29,7 @@ PUBLIC int DobbyDestroy(void *address) {
   if (entry) {
     gInterceptor.remove((addr_t)address);
     entry->restore_orig_code();
-    // FIXME: delete entry safely
-    // delete entry;
+    delete entry;
     return 0;
   }
 

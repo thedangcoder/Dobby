@@ -64,6 +64,15 @@ struct MemoryAllocator {
 
   inline static MemoryAllocator *Shared();
 
+  // Note: Linear allocators don't support individual block freeing.
+  // This is a no-op but provided for API consistency.
+  // Memory is reclaimed when the allocator is destroyed.
+  void freeMemBlock(MemBlock block) {
+    // Linear allocator cannot free individual blocks
+    // Memory will be reused when pages are full and new ones allocated
+    (void)block;
+  }
+
   MemBlock allocMemBlock(size_t in_size, bool is_exec = true) {
     if (in_size > OSMemory::PageSize()) {
       ERROR_LOG("alloc size too large: %d", in_size);

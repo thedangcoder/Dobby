@@ -21,12 +21,14 @@ struct InterceptRouting {
 
   ~InterceptRouting() {
     if (trampoline) {
-      // TODO: free code block
+      gMemoryAllocator.freeMemBlock(trampoline->buffer);
       delete trampoline;
+      trampoline = nullptr;
     }
     if (near_trampoline) {
-      // TODO: free code block
+      gMemoryAllocator.freeMemBlock(near_trampoline->buffer);
       delete near_trampoline;
+      near_trampoline = nullptr;
     }
   }
 

@@ -12,8 +12,9 @@ struct InstrumentRouting : InterceptRouting {
 
   ~InstrumentRouting() {
     if (instrument_tramp) {
-      // TODO: free code block
+      gMemoryAllocator.freeMemBlock(instrument_tramp->buffer);
       delete instrument_tramp;
+      instrument_tramp = nullptr;
     }
   }
 
@@ -67,6 +68,7 @@ PUBLIC inline int DobbyInstrument(void *address, dobby_instrument_callback_t pre
 
   if (routing->error) {
     ERROR_LOG("build routing error.");
+    delete entry; // This also deletes routing via Entry destructor
     return -1;
   }
 
