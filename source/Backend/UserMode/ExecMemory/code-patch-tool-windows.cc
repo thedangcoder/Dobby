@@ -5,23 +5,41 @@
 using namespace zz;
 
 PUBLIC int DobbyCodePatch(void *address, uint8_t *buffer, uint32_t buffer_size) {
+  if (!address || !buffer || buffer_size == 0) {
+    ERROR_LOG("DobbyCodePatch: invalid parameters (address=%p, buffer=%p, size=%u)", address, buffer, buffer_size);
+    return kMemoryOperationError;
+  }
+
   DWORD oldProtect;
-  int page_size;
+  DWORD oldProtect2;
 
   // Get page size
   SYSTEM_INFO si;
   GetSystemInfo(&si);
-  page_size = si.dwPageSize;
+  int page_size = si.dwPageSize;
 
-  void *addressPageAlign = (void *)ALIGN(address, page_size);
+  void *addressPageAlign = (void *)ALIGN_FLOOR(address, page_size);
+  void *endAddressPageAlign = (void *)ALIGN_FLOOR((uintptr_t)address + buffer_size, page_size);
 
-  if (!VirtualProtect(addressPageAlign, page_size, PAGE_EXECUTE_READWRITE, &oldProtect))
+  // Calculate total size to protect (may span multiple pages)
+  size_t protect_size = (uintptr_t)endAddressPageAlign - (uintptr_t)addressPageAlign + page_size;
+
+  if (!VirtualProtect(addressPageAlign, protect_size, PAGE_EXECUTE_READWRITE, &oldProtect)) {
+    DWORD err = GetLastError();
+    ERROR_LOG("DobbyCodePatch: VirtualProtect RWX failed for %p (size=%zu): error %lu", addressPageAlign, protect_size, err);
     return kMemoryOperationError;
+  }
 
   memcpy(address, buffer, buffer_size);
 
-  if (!VirtualProtect(addressPageAlign, page_size, oldProtect, &oldProtect))
+  if (!VirtualProtect(addressPageAlign, protect_size, oldProtect, &oldProtect2)) {
+    DWORD err = GetLastError();
+    ERROR_LOG("DobbyCodePatch: VirtualProtect restore failed for %p: error %lu", addressPageAlign, err);
     return kMemoryOperationError;
+  }
+
+  // Flush instruction cache
+  FlushInstructionCache(GetCurrentProcess(), address, buffer_size);
 
   return 0;
 }

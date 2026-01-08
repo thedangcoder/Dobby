@@ -3,6 +3,7 @@
 #include "common/linear_allocator.h"
 #include "PlatformUnifiedInterface/platform.h"
 #include "dobby/platform_mutex.h"
+#include <new>
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define max(a, b) (((a) > (b)) ? (a) : (b))
@@ -78,8 +79,13 @@ struct MemoryAllocator {
   MemBlock allocMemBlock(size_t in_size, bool is_exec = true) {
     DobbyLockGuard lock(mutex);
 
+    if (in_size == 0) {
+      ERROR_LOG("allocMemBlock: invalid size 0");
+      return {};
+    }
+
     if (in_size > OSMemory::PageSize()) {
-      ERROR_LOG("alloc size too large: %d", in_size);
+      ERROR_LOG("allocMemBlock: size too large: %zu (max: %zu)", in_size, OSMemory::PageSize());
       return {};
     }
 
@@ -92,18 +98,40 @@ struct MemoryAllocator {
     }
 
     if (!result) {
-      {
-        auto page = OSMemory::Allocate(OSMemory::PageSize(), kNoAccess);
-        OSMemory::SetPermission(page, OSMemory::PageSize(), is_exec ? kReadExecute : kReadWrite);
-        auto page_allocator = new simple_linear_allocator_t((uint8_t *)page, OSMemory::PageSize());
-        if (is_exec)
-          code_page_allocators.push_back(page_allocator);
-        else
-          data_page_allocators.push_back(page_allocator);
+      auto page = OSMemory::Allocate(OSMemory::PageSize(), kNoAccess);
+      if (!page) {
+        ERROR_LOG("allocMemBlock: OSMemory::Allocate failed for %s block (size: %zu)",
+                  is_exec ? "exec" : "data", in_size);
+        return {};
       }
+
+      if (!OSMemory::SetPermission(page, OSMemory::PageSize(), is_exec ? kReadExecute : kReadWrite)) {
+        ERROR_LOG("allocMemBlock: OSMemory::SetPermission failed for %s block", is_exec ? "exec" : "data");
+        OSMemory::Free(page, OSMemory::PageSize());
+        return {};
+      }
+
+      auto page_allocator = new (std::nothrow) simple_linear_allocator_t((uint8_t *)page, OSMemory::PageSize());
+      if (!page_allocator) {
+        ERROR_LOG("allocMemBlock: failed to create page allocator");
+        OSMemory::Free(page, OSMemory::PageSize());
+        return {};
+      }
+
+      if (is_exec)
+        code_page_allocators.push_back(page_allocator);
+      else
+        data_page_allocators.push_back(page_allocator);
+
       auto allocator = is_exec ? code_page_allocators.back() : data_page_allocators.back();
       result = (uint8_t *)allocator->alloc(in_size);
     }
+
+    if (!result) {
+      ERROR_LOG("allocMemBlock: allocation failed for %s block (size: %zu)", is_exec ? "exec" : "data", in_size);
+      return {};
+    }
+
     return MemBlock((addr_t)result, in_size);
   }
 
