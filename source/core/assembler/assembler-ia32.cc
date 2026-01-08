@@ -24,7 +24,7 @@ void PseudoLabel::link_confused_instructions(CodeMemBuffer *buffer) {
       // but the ip register not the real call next insn
       // it need add two insn length == 7
       int disp32_fix_pos = ref_label_insn.inst_offset - sizeof(int32_t);
-      buffer->FixBindLabel(disp32_fix_pos, new_offset + 7);
+      buffer->Store<int32_t>(disp32_fix_pos, (int32_t)(new_offset + 7));
     }
   }
 }
