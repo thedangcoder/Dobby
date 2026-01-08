@@ -109,18 +109,36 @@ class LinuxPlatformBuilder(PlatformBuilder):
     self.shared_output_name = "libdobby.so"
     self.static_output_name = "libdobby.a"
 
-    targets = {
-      "x86": "i686-linux-gnu",
-      "x86_64": "x86_64-linux-gnu",
-      "arm": "arm-linux-gnueabi",
-      "aarch64": "aarch64-linux-gnu",
+    # GCC cross-compiler prefixes for each architecture
+    gcc_prefixes = {
+      "x86": "",  # Native or use i686-linux-gnu
+      "x86_64": "",  # Native
+      "arm": "arm-linux-gnueabihf",
+      "arm64": "aarch64-linux-gnu",
     }
 
-    # self.cmake_args += ["--target={}".format(targets[arch])]
     self.cmake_args += [
       "-DCMAKE_SYSTEM_NAME=Linux",
       "-DCMAKE_SYSTEM_PROCESSOR={}".format(arch),
     ]
+
+    # If no LLVM dir specified, use GCC cross-compilers
+    if PlatformBuilder.llvm_dir is None:
+      prefix = gcc_prefixes.get(arch, "")
+      if prefix:
+        # Override clang with GCC cross-compiler
+        self.cmake_args = [arg for arg in self.cmake_args if not arg.startswith("-DCMAKE_C_COMPILER") and not arg.startswith("-DCMAKE_CXX_COMPILER")]
+        self.cmake_args += [
+          f"-DCMAKE_C_COMPILER={prefix}-gcc",
+          f"-DCMAKE_CXX_COMPILER={prefix}-g++",
+        ]
+      else:
+        # Native build - use default gcc/g++
+        self.cmake_args = [arg for arg in self.cmake_args if not arg.startswith("-DCMAKE_C_COMPILER") and not arg.startswith("-DCMAKE_CXX_COMPILER")]
+        self.cmake_args += [
+          "-DCMAKE_C_COMPILER=gcc",
+          "-DCMAKE_CXX_COMPILER=g++",
+        ]
 
 
 class AndroidPlatformBuilder(PlatformBuilder):
@@ -134,6 +152,9 @@ class AndroidPlatformBuilder(PlatformBuilder):
     android_api_level = 21
     if arch == "armeabi-v7a" or arch == "x86":
       android_api_level = 19
+
+    # Remove compiler args - Android NDK toolchain handles this automatically
+    self.cmake_args = [arg for arg in self.cmake_args if not arg.startswith("-DCMAKE_C_COMPILER") and not arg.startswith("-DCMAKE_CXX_COMPILER")]
 
     self.cmake_args += [
       "-DCMAKE_SYSTEM_NAME=Android", f"-DCMAKE_ANDROID_NDK={android_nkd_dir}", f"-DCMAKE_ANDROID_ARCH_ABI={arch}",
