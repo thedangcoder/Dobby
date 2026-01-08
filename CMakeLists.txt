@@ -59,7 +59,7 @@ else ()
   set(compile_definitions "${compile_definitions} -DDOBBY_LOGGING_DISABLE")
 endif ()
 
-set(compile_definitions "${compile_definitions} -DBUILD_WITH_TRAMPOLINE_ASM")
+# BUILD_WITH_TRAMPOLINE_ASM is set per-architecture below based on ASM file availability
 
 if (CMAKE_GENERATOR STREQUAL Xcode)
 endif ()
@@ -234,6 +234,7 @@ if (PROCESSOR.AARCH64)
     source/TrampolineBridge/ClosureTrampolineBridge/arm64/closure_bridge_arm64.asm
     source/TrampolineBridge/ClosureTrampolineBridge/arm64/closure_trampoline_arm64.asm
     )
+  set(compile_definitions "${compile_definitions} -DBUILD_WITH_TRAMPOLINE_ASM")
 endif ()
 
 # x64 ASM files only work on Darwin (macOS) due to assembly syntax differences
@@ -242,6 +243,7 @@ if (PROCESSOR.X86_64 AND SYSTEM.Darwin)
     source/TrampolineBridge/ClosureTrampolineBridge/x64/closure_bridge_x64.asm
     source/TrampolineBridge/ClosureTrampolineBridge/x64/closure_trampoline_x64.asm
     )
+  set(compile_definitions "${compile_definitions} -DBUILD_WITH_TRAMPOLINE_ASM")
 endif ()
 
 # ---
@@ -339,7 +341,6 @@ set_target_properties(dobby_static
 
 target_compile_definitions(dobby PRIVATE
   "COMPILE_DEFINITIONS ${compile_definitions}"
-  -DBUILD_WITH_TRAMPOLINE_ASM
   )
 target_compile_definitions(dobby_static PRIVATE
   "COMPILE_DEFINITIONS ${compile_definitions}"
