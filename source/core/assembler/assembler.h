@@ -31,6 +31,16 @@ struct AssemblerBase {
     this->fixed_addr = in_fixed_addr;
   }
 
+  // Alias for compatibility
+  void SetRealizedAddress(void *address) {
+    set_fixed_addr((addr_t)address);
+  }
+
+  // Alias for compatibility
+  size_t ip_offset() {
+    return pc_offset();
+  }
+
   CodeMemBuffer *code_buffer() {
     return &code_buffer_;
   }

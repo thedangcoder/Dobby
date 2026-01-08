@@ -9,25 +9,27 @@
 #include "InstructionRelocation/x86/InstructionRelocationX86.h"
 
 #include "MemoryAllocator/NearMemoryAllocator.h"
-#include "InterceptRouting/RoutingPlugin/RoutingPlugin.h"
+#include "InterceptRouting/RoutingPlugin.h"
 
 using namespace zz::x86;
 
-CodeMemBuffer *GenerateNormalTrampolineBuffer(addr_t from, addr_t to) {
+Trampoline *GenerateNormalTrampolineBuffer(addr_t from, addr_t to) {
   TurboAssembler turbo_assembler_((void *)from);
 #define _ turbo_assembler_.
 
   CodeGen codegen(&turbo_assembler_);
   codegen.JmpNear((uint32_t)to);
 
-  CodeMemBuffer *result = NULL;
-  result = turbo_assembler_.code_buffer()->Copy();
-  return result;
+  _ relocDataLabels();
+
+  auto tramp_buffer = turbo_assembler_.code_buffer();
+  auto tramp_block = tramp_buffer->dup();
+  return new Trampoline(TRAMPOLINE_UNKNOWN, tramp_block);
 }
 
-CodeMemBuffer *GenerateNearTrampolineBuffer(addr_t src, addr_t dst) {
+Trampoline *GenerateNearTrampolineBuffer(addr_t src, addr_t dst) {
   DEBUG_LOG("x86 near branch trampoline enable default");
-  return NULL;
+  return nullptr;
 }
 
 #endif

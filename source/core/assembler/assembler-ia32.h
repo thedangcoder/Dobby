@@ -435,7 +435,7 @@ public:
     MovRipToRegister(VOLATILE_REGISTER);
     call(Address(VOLATILE_REGISTER, INT32_MAX));
     {
-      auto label = RelocDataLabel::withData(function.address());
+      auto label = RelocDataLabel::withData(function.address);
       label->link_to(kDisp32_off_7, pc_offset());
       data_labels.push_back(label);
     }

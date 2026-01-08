@@ -16,12 +16,12 @@ using namespace zz::x86;
 int GenRelocateCodeFixed(void *buffer, CodeMemBlock *origin, CodeMemBlock *relocated, bool branch) {
   TurboAssembler turbo_assembler_(0);
   // Set fixed executable code chunk address
-  turbo_assembler_.SetRealizedAddress((void *)relocated->addr);
+  turbo_assembler_.SetRealizedAddress((void *)relocated->addr());
 #define _ turbo_assembler_.
 #define __ turbo_assembler_.code_buffer()->
 
-  auto curr_orig_ip = (addr32_t)origin->addr;
-  auto curr_relo_ip = (addr32_t)relocated->addr;
+  auto curr_orig_ip = (addr32_t)origin->addr();
+  auto curr_relo_ip = (addr32_t)relocated->addr();
 
   uint8_t *buffer_cursor = (uint8_t *)buffer;
 
@@ -39,7 +39,7 @@ int GenRelocateCodeFixed(void *buffer, CodeMemBlock *origin, CodeMemBlock *reloc
     // go next
     curr_orig_ip += insn.length;
     buffer_cursor += insn.length;
-    curr_relo_ip = (addr32_t)relocated->addr + turbo_assembler_.ip_offset();
+    curr_relo_ip = (addr32_t)relocated->addr() + turbo_assembler_.ip_offset();
   }
 
   // jmp to the origin rest instructions
@@ -50,10 +50,10 @@ int GenRelocateCodeFixed(void *buffer, CodeMemBlock *origin, CodeMemBlock *reloc
   }
 
   // update origin
-  int new_origin_len = curr_orig_ip - (addr_t)origin->addr;
-  origin->reset(origin->addr, new_origin_len);
+  int new_origin_len = curr_orig_ip - (addr_t)origin->addr();
+  origin->reset(origin->addr(), new_origin_len);
 
-  int relo_len = turbo_assembler_.code_buffer()->GetBufferSize();
+  int relo_len = turbo_assembler_.code_buffer()->size();
   if (relo_len > relocated->size) {
     DEBUG_LOG("pre-alloc code chunk not enough");
     return -1;
@@ -61,9 +61,8 @@ int GenRelocateCodeFixed(void *buffer, CodeMemBlock *origin, CodeMemBlock *reloc
 
   // generate executable code
   {
-    auto code = AssemblyCodeBuilder::FinalizeFromTurboAssembler(&turbo_assembler_);
-    relocated->reset(code->addr, code->size);
-    delete code;
+    auto code = AssemblerCodeBuilder::FinalizeFromTurboAssembler(&turbo_assembler_);
+    relocated->reset(code.addr(), code.size);
   }
 
   return 0;

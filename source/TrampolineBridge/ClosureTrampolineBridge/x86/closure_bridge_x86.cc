@@ -101,8 +101,8 @@ asm_func_t get_closure_bridge_addr() {
 
   _ relocDataLabels();
 
-  auto code = AssemblyCodeBuilder::FinalizeFromTurboAssembler(&turbo_assembler_);
-  closure_bridge = (asm_func_t)code->addr;
+  auto code = AssemblerCodeBuilder::FinalizeFromTurboAssembler(&turbo_assembler_);
+  closure_bridge = (asm_func_t)code.addr();
 
   DEBUG_LOG("[closure bridge]  closure bridge at %p", closure_bridge);
 #endif
