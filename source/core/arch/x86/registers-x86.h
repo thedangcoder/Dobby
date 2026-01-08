@@ -49,7 +49,7 @@ public:
 
 public:
   bool is_byte_register() const {
-    return reg_code_ <= 3;
+    return reg_id <= 3;
   }
 
   int size() {

@@ -5,7 +5,7 @@
 #include "core/arch/x86/registers-x86.h"
 #include "core/assembler/assembler.h"
 
-#include "MemoryAllocator/CodeBuffer/code_buffer_x86.h"
+#include "MemoryAllocator/CodeMemBuffer.h"
 
 #define IsInt8(imm) (-128 <= imm && imm <= 127)
 
@@ -227,31 +227,27 @@ private:
 
 class Assembler : public AssemblerBase {
 public:
-  Assembler(void *address) : AssemblerBase(address) {
-    buffer_ = new CodeBuffer();
+  Assembler(void *address) : AssemblerBase((addr_t)address) {
   }
   ~Assembler() {
-    if (buffer_)
-      delete buffer_;
-    buffer_ = NULL;
   }
 
 public:
   void Emit1(byte_t val) {
-    buffer_->Emit<int8_t>(val);
+    code_buffer_.Emit<int8_t>(val);
   }
 
   void Emit(int32_t value) {
-    buffer_->Emit<int32_t>(value);
+    code_buffer_.Emit<int32_t>(value);
   }
 
   // ---
 
   void EmitImmediate(Immediate imm, int imm_size) {
     if (imm_size == 8) {
-      buffer_->Emit<int8_t>((uint8_t)imm.value());
+      code_buffer_.Emit<int8_t>((uint8_t)imm.value());
     } else if (imm_size == 32) {
-      buffer_->Emit<int32_t>((uint32_t)imm.value());
+      code_buffer_.Emit<int32_t>((uint32_t)imm.value());
     } else {
       UNREACHABLE();
     }
@@ -264,7 +260,7 @@ public:
 
   void Emit_OpEn_Register_MemOperand(Register dst, Address &operand) {
     EmitModRM_Update_Register(operand.modrm(), dst);
-    buffer_->EmitBuffer(&operand.encoding_[1], operand.length_ - 1);
+    code_buffer_.EmitBuffer(&operand.encoding_[1], operand.length_ - 1);
   }
 
   void Emit_OpEn_Register_RegOperand(Register dst, Register src) {
@@ -273,7 +269,7 @@ public:
 
   void Emit_OpEn_MemOperand_Immediate(uint8_t extra_opcode, Address &operand, Immediate imm) {
     EmitModRM_Update_ExtraOpcode(operand.modrm(), extra_opcode);
-    buffer_->EmitBuffer(&operand.encoding_[1], operand.length_ - 1);
+    code_buffer_.EmitBuffer(&operand.encoding_[1], operand.length_ - 1);
     EmitImmediate(imm, imm.size());
   }
 
@@ -284,7 +280,7 @@ public:
 
   void Emit_OpEn_MemOperand(uint8_t extra_opcode, Address &operand) {
     EmitModRM_Update_ExtraOpcode(operand.modrm(), extra_opcode);
-    buffer_->EmitBuffer(&operand.encoding_[1], operand.length_ - 1);
+    code_buffer_.EmitBuffer(&operand.encoding_[1], operand.length_ - 1);
   }
 
   void Emit_OpEn_RegOperand(uint8_t extra_opcode, Register reg) {
@@ -440,8 +436,8 @@ public:
     call(Address(VOLATILE_REGISTER, INT32_MAX));
     {
       auto label = RelocDataLabel::withData(function.address());
-      label->link_to(kDisp32_off_7, ip_offset());
-      AppendRelocLabel(label);
+      label->link_to(kDisp32_off_7, pc_offset());
+      data_labels.push_back(label);
     }
     nop();
   }
