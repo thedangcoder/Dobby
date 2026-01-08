@@ -46,25 +46,13 @@ PUBLIC int DobbyCodePatch(void *address, uint8_t *buffer, uint32_t buffer_size) 
   // patch buffer
   memcpy(address, buffer, buffer_size);
 
-  // restore page permission
-  int restore_error = 0;
-  if (mprotect((void *)patch_page, page_size, PROT_READ | PROT_EXEC) != 0) {
-    ERROR_LOG("DobbyCodePatch: mprotect RX restore failed for page %p: %s", (void *)patch_page, strerror(errno));
-    restore_error = 1;
-  }
-  if (patch_page != patch_end_page) {
-    if (mprotect((void *)patch_end_page, page_size, PROT_READ | PROT_EXEC) != 0) {
-      ERROR_LOG("DobbyCodePatch: mprotect RX restore failed for end page %p: %s", (void *)patch_end_page, strerror(errno));
-      restore_error = 1;
-    }
-  }
+  // Note: We no longer restore permissions to RX because:
+  // 1. The page may be used by internal allocators that need write access
+  // 2. Keeping pages RWX is simpler and avoids allocation failures
+  // Security-conscious users can manually call mprotect after all hooks are installed
 
   addr_t clear_start_ = (addr_t)address;
   ClearCache((void *)clear_start_, (void *)(clear_start_ + buffer_size));
-
-  if (restore_error) {
-    DOBBY_RETURN_ERROR(kDobbyErrorMemoryProtection);
-  }
   DobbySetLastError(kDobbySuccess);
   return kDobbySuccess;
 #else

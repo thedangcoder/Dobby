@@ -1,4 +1,5 @@
 #include "dobby/dobby_error.h"
+#include "dobby/utility_macro.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -12,15 +13,15 @@ static THREAD_LOCAL DobbyError g_last_error = kDobbySuccess;
 
 extern "C" {
 
-DobbyError DobbyGetLastError(void) {
+PUBLIC DobbyError DobbyGetLastError(void) {
   return g_last_error;
 }
 
-void DobbySetLastError(DobbyError error) {
+PUBLIC void DobbySetLastError(DobbyError error) {
   g_last_error = error;
 }
 
-const char *DobbyErrorString(DobbyError error) {
+PUBLIC const char *DobbyErrorString(DobbyError error) {
   switch (error) {
   case kDobbySuccess:
     return "Success";

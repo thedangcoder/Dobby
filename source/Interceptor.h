@@ -23,6 +23,8 @@ struct Interceptor {
     dobby_instrument_callback_t pre_handler;
     dobby_instrument_callback_t post_handler;
 
+    addr_t epilogue_dispatch_bridge = 0;
+
     addr_t addr;
 
     MemBlock patched;

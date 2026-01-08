@@ -116,7 +116,8 @@ void Logger::logv(LogLevel level, const char *in_fmt, va_list ap) {
 #if defined(__ANDROID__)
     __android_log_print(ANDROID_LOG_INFO, NULL, out_buffer);
 #else
-    printf(out_buffer);
+    printf("%s", out_buffer);
+    fflush(stdout);
 #endif
   }
 }

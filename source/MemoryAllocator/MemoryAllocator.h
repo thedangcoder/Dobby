@@ -141,7 +141,10 @@ struct MemoryAllocator {
         return {};
       }
 
-      if (!OSMemory::SetPermission(page, OSMemory::PageSize(), is_exec ? kReadExecute : kReadWrite)) {
+      // For exec blocks, we need RWX initially to allow writing code.
+      // The page will remain RWX (required for dynamic code generation).
+      // For data blocks, RW is sufficient.
+      if (!OSMemory::SetPermission(page, OSMemory::PageSize(), is_exec ? kReadWriteExecute : kReadWrite)) {
         ERROR_LOG("allocMemBlock: OSMemory::SetPermission failed for %s block", is_exec ? "exec" : "data");
         OSMemory::Free(page, OSMemory::PageSize());
         return {};

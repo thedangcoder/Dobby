@@ -12,4 +12,12 @@ void set_routing_bridge_next_hop(DobbyRegisterContext *ctx, void *address) {
 void get_routing_bridge_next_hop(DobbyRegisterContext *ctx, void *address) {
 }
 
+void *get_func_ret_address(DobbyRegisterContext *ctx) {
+  return (void *)ctx->lr;
+}
+
+void set_func_ret_address(DobbyRegisterContext *ctx, void *address) {
+  ctx->lr = (uint64_t)address;
+}
+
 #endif

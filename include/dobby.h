@@ -396,6 +396,42 @@ typedef void (*dobby_instrument_callback_t)(void *address, DobbyRegisterContext 
 int DobbyInstrument(void *address, dobby_instrument_callback_t pre_handler);
 
 /**
+ * @brief Instrument a function with pre and post execution callbacks
+ *
+ * Installs callbacks that are invoked before and after the target function executes.
+ * Unlike DobbyHook, the original function always executes between the callbacks.
+ * The post_handler receives the full register context including return value.
+ *
+ * @param address Target function address to instrument
+ * @param pre_handler Callback invoked before function execution (can be NULL)
+ * @param post_handler Callback invoked after function execution (can be NULL)
+ *
+ * @return kDobbySuccess on success, or error code:
+ *         - kDobbyErrorInvalidArgument: NULL address or both handlers NULL
+ *         - kDobbyErrorAlreadyExists: Address already instrumented
+ *         - kDobbyErrorRoutingBuild: Failed to build instrumentation
+ *
+ * @code
+ * void pre_handler(void *addr, DobbyRegisterContext *ctx) {
+ *     printf("Function called with arg1=%p\n", (void*)ctx->general.regs.rdi);
+ * }
+ *
+ * void post_handler(void *addr, DobbyRegisterContext *ctx) {
+ *     printf("Function returned %p\n", (void*)ctx->general.regs.rax);
+ * }
+ *
+ * DobbyInstrumentEx(target_func, pre_handler, post_handler);
+ * @endcode
+ *
+ * @note Requires thread-local storage for tracking return addresses
+ * @note Post-handler may not be called if function uses tail call optimization
+ * @see DobbyDestroy() to remove the instrumentation
+ */
+int DobbyInstrumentEx(void *address,
+                      dobby_instrument_callback_t pre_handler,
+                      dobby_instrument_callback_t post_handler);
+
+/**
  * @brief Remove a hook or instrumentation and restore original code
  *
  * @param address Address that was previously hooked or instrumented

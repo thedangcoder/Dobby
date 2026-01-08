@@ -126,7 +126,8 @@ void closure_bridge_init_impl() {
 
   auto closure_bridge = AssemblerCodeBuilder::FinalizeFromTurboAssembler(&turbo_assembler_);
   closure_bridge_addr = (void *)closure_bridge.addr();
-  DEBUG_LOG("[closure bridge] closure bridge at %p", closure_bridge_addr);
+  DEBUG_LOG("[closure bridge] closure bridge at %p, size: %d", closure_bridge_addr, closure_bridge.size);
+  debug_hex_log_buffer((uint8_t *)closure_bridge_addr, closure_bridge.size);
 #endif
 }
 

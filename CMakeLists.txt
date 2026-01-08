@@ -92,7 +92,7 @@ include_directories(
   ./builtin-plugin
 )
 
-if (SYSTEM.Darwin AND (NOT DOBBY_BUILD_KERNEL_MODE))
+if (NOT DOBBY_BUILD_KERNEL_MODE)
   include_directories(
     source/Backend/UserMode
   )
@@ -170,6 +170,11 @@ if (SYSTEM.Darwin AND NOT DOBBY_BUILD_KERNEL_MODE)
 
     source/Backend/UserMode/ExecMemory/code-patch-tool-darwin.cc
     source/Backend/UserMode/ExecMemory/clear-cache-tool-all.c
+
+    # multi thread support for post-handler
+    source/Backend/UserMode/MultiThreadSupport/ThreadSupport.cpp
+    source/Backend/UserMode/Thread/PlatformThread.cc
+    source/Backend/UserMode/Thread/platform-thread-posix.cc
     )
 
 elseif (SYSTEM.Linux OR SYSTEM.Android)
@@ -180,6 +185,11 @@ elseif (SYSTEM.Linux OR SYSTEM.Android)
 
     source/Backend/UserMode/ExecMemory/code-patch-tool-posix.cc
     source/Backend/UserMode/ExecMemory/clear-cache-tool-all.c
+
+    # multi thread support for post-handler
+    source/Backend/UserMode/MultiThreadSupport/ThreadSupport.cpp
+    source/Backend/UserMode/Thread/PlatformThread.cc
+    source/Backend/UserMode/Thread/platform-thread-posix.cc
     )
 elseif (SYSTEM.Windows)
   set(dobby.SOURCE_FILE_LIST ${dobby.SOURCE_FILE_LIST}
@@ -189,6 +199,11 @@ elseif (SYSTEM.Windows)
 
     source/Backend/UserMode/ExecMemory/code-patch-tool-windows.cc
     source/Backend/UserMode/ExecMemory/clear-cache-tool-all.c
+
+    # multi thread support for post-handler
+    source/Backend/UserMode/MultiThreadSupport/ThreadSupport.cpp
+    source/Backend/UserMode/Thread/PlatformThread.cc
+    source/Backend/UserMode/Thread/platform-thread-windows.cc
     )
 endif ()
 

@@ -6,8 +6,11 @@
 
 struct InstrumentRouting : InterceptRouting {
   ClosureTrampoline *instrument_tramp = nullptr;
+  ClosureTrampoline *epilogue_tramp = nullptr;
 
-  InstrumentRouting(Interceptor::Entry *entry, dobby_instrument_callback_t pre_handler) : InterceptRouting(entry) {
+  InstrumentRouting(Interceptor::Entry *entry, dobby_instrument_callback_t pre_handler,
+                    dobby_instrument_callback_t post_handler)
+      : InterceptRouting(entry) {
   }
 
   ~InstrumentRouting() {
@@ -15,6 +18,11 @@ struct InstrumentRouting : InterceptRouting {
       gMemoryAllocator.freeMemBlock(instrument_tramp->buffer);
       delete instrument_tramp;
       instrument_tramp = nullptr;
+    }
+    if (epilogue_tramp) {
+      gMemoryAllocator.freeMemBlock(epilogue_tramp->buffer);
+      delete epilogue_tramp;
+      epilogue_tramp = nullptr;
     }
   }
 
@@ -27,10 +35,20 @@ struct InstrumentRouting : InterceptRouting {
     instrument_tramp = ::GenerateInstrumentClosureTrampoline(entry);
   }
 
+  void GenerateEpilogueClosureTrampoline() {
+    __FUNC_CALL_TRACE__();
+    if (entry->post_handler) {
+      epilogue_tramp = ::GenerateEpilogueClosureTrampoline(entry);
+      entry->epilogue_dispatch_bridge = epilogue_tramp->addr();
+    }
+  }
+
   void BuildRouting() {
     __FUNC_CALL_TRACE__();
 
     GenerateInstrumentClosureTrampoline();
+
+    GenerateEpilogueClosureTrampoline();
 
     GenerateTrampoline();
 
@@ -40,10 +58,16 @@ struct InstrumentRouting : InterceptRouting {
   }
 };
 
-PUBLIC inline int DobbyInstrument(void *address, dobby_instrument_callback_t pre_handler) {
+PUBLIC inline int DobbyInstrumentEx(void *address, dobby_instrument_callback_t pre_handler,
+                                     dobby_instrument_callback_t post_handler) {
   __FUNC_CALL_TRACE__();
   if (!address) {
     ERROR_LOG("address is 0x0.");
+    DOBBY_RETURN_ERROR(kDobbyErrorInvalidArgument);
+  }
+
+  if (!pre_handler && !post_handler) {
+    ERROR_LOG("both pre_handler and post_handler are null.");
     DOBBY_RETURN_ERROR(kDobbyErrorInvalidArgument);
   }
 
@@ -60,8 +84,9 @@ PUBLIC inline int DobbyInstrument(void *address, dobby_instrument_callback_t pre
 
   entry = new Interceptor::Entry((addr_t)address);
   entry->pre_handler = pre_handler;
+  entry->post_handler = post_handler;
 
-  auto routing = new InstrumentRouting(entry, pre_handler);
+  auto routing = new InstrumentRouting(entry, pre_handler, post_handler);
   routing->BuildRouting();
   routing->Active();
   entry->routing = routing;
@@ -77,4 +102,9 @@ PUBLIC inline int DobbyInstrument(void *address, dobby_instrument_callback_t pre
 
   DobbySetLastError(kDobbySuccess);
   return kDobbySuccess;
+}
+
+// Backward compatible version with only pre_handler
+PUBLIC inline int DobbyInstrument(void *address, dobby_instrument_callback_t pre_handler) {
+  return DobbyInstrumentEx(address, pre_handler, nullptr);
 }
