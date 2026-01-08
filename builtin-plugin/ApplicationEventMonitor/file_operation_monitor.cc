@@ -14,29 +14,55 @@
 
 std::unordered_map<FILE *, const char *> *TracedFopenFileList;
 
+// Safe string copy with bounds checking
+static char *safe_strdup(const char *src, size_t max_len) {
+  if (!src) return nullptr;
+  size_t len = strlen(src);
+  if (len >= max_len) len = max_len - 1;
+  char *dst = (char *)malloc(len + 1);
+  if (dst) {
+    memcpy(dst, src, len);
+    dst[len] = '\0';
+  }
+  return dst;
+}
+
 FILE *(*orig_fopen)(const char *filename, const char *mode);
 FILE *fake_fopen(const char *filename, const char *mode) {
   FILE *result = NULL;
   result = orig_fopen(filename, mode);
-  if (result != NULL) {
-    char *traced_filename = (char *)malloc(MAXPATHLEN);
-    // FIXME: strncpy
-    strcpy(traced_filename, filename);
-    std::cout << "[-] trace file: " << filename << std::endl;
-    TracedFopenFileList->insert(std::make_pair(result, traced_filename));
+  if (result != NULL && filename) {
+    char *traced_filename = safe_strdup(filename, MAXPATHLEN);
+    if (traced_filename) {
+      std::cout << "[-] trace file: " << filename << std::endl;
+      TracedFopenFileList->insert(std::make_pair(result, traced_filename));
+    }
   }
   return result;
 }
 
 static const char *GetFileDescriptorTraced(FILE *stream, bool removed) {
+  if (!TracedFopenFileList)
+    return NULL;
   std::unordered_map<FILE *, const char *>::iterator it;
   it = TracedFopenFileList->find(stream);
   if (it != TracedFopenFileList->end()) {
+    const char *filename = it->second;
     if (removed)
       TracedFopenFileList->erase(it);
-    return it->second;
+    return filename;
   }
   return NULL;
+}
+
+int (*orig_fclose)(FILE *stream);
+int fake_fclose(FILE *stream) {
+  const char *traced_filename = GetFileDescriptorTraced(stream, true);
+  if (traced_filename) {
+    LOG("[-] fclose: %s\n", traced_filename);
+    free((void *)traced_filename);
+  }
+  return orig_fclose(stream);
 }
 
 size_t (*orig_fread)(void *ptr, size_t size, size_t count, FILE *stream);

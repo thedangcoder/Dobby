@@ -14,7 +14,7 @@ struct InterceptRouting {
   Interceptor::Entry *entry = 0;
   Trampoline *trampoline = 0;
   Trampoline *near_trampoline = 0;
-  int error = 0;
+  DobbyError error = kDobbySuccess;
 
   explicit InterceptRouting(Interceptor::Entry *entry) : entry(entry) {
   }
@@ -59,7 +59,9 @@ struct InterceptRouting {
   virtual void Active() {
     __FUNC_CALL_TRACE__();
     auto ret = DobbyCodePatch((void *)entry->addr, (uint8_t *)trampoline_addr(), trampoline_size());
-    error |= (ret != 0);
+    if (DOBBY_FAILED(ret)) {
+      error = (DobbyError)ret;
+    }
   }
 
   bool GenerateTrampoline() {
@@ -88,7 +90,8 @@ struct InterceptRouting {
     __FUNC_CALL_TRACE__();
     if (trampoline_addr() == 0) {
       ERROR_LOG("GenerateTrampoline must be called first");
-      error = 1;
+      error = kDobbyErrorTrampolineGeneration;
+      return;
     }
 
     auto code_addr = entry->addr;
@@ -98,7 +101,8 @@ struct InterceptRouting {
     auto relocated = CodeMemBlock(0, 0);
     GenRelocateCodeAndBranch((void *)code_addr, &origin, &relocated);
     if (relocated.size == 0) {
-      error = 1;
+      ERROR_LOG("instruction relocation failed");
+      error = kDobbyErrorRelocationFailed;
       return;
     }
     DEBUG_LOG("origin: %p, size: %d", origin.addr(), origin.size);

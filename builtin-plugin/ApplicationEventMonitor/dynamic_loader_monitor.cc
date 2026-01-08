@@ -19,15 +19,28 @@
 
 std::unordered_map<void *, const char *> traced_dlopen_handle_list;
 
+// Safe string copy with bounds checking
+static char *safe_strdup(const char *src, size_t max_len) {
+  if (!src) return nullptr;
+  size_t len = strlen(src);
+  if (len >= max_len) len = max_len - 1;
+  char *dst = (char *)malloc(len + 1);
+  if (dst) {
+    memcpy(dst, src, len);
+    dst[len] = '\0';
+  }
+  return dst;
+}
+
 static void *(*orig_dlopen)(const char *__file, int __mode);
 static void *fake_dlopen(const char *__file, int __mode) {
   void *result = orig_dlopen(__file, __mode);
   if (result != NULL && __file) {
-    char *traced_filename = (char *)malloc(MAXPATHLEN);
-    // FIXME: strncpy
-    strcpy(traced_filename, __file);
-    INFO_LOG("[-] dlopen handle: %s", __file);
-    traced_dlopen_handle_list.insert(std::make_pair(result, (const char *)traced_filename));
+    char *traced_filename = safe_strdup(__file, MAXPATHLEN);
+    if (traced_filename) {
+      INFO_LOG("[-] dlopen handle: %s", __file);
+      traced_dlopen_handle_list.insert(std::make_pair(result, (const char *)traced_filename));
+    }
   }
   return result;
 }
@@ -35,12 +48,12 @@ static void *fake_dlopen(const char *__file, int __mode) {
 static void *(*orig_loader_dlopen)(const char *filename, int flags, const void *caller_addr);
 static void *fake_loader_dlopen(const char *filename, int flags, const void *caller_addr) {
   void *result = orig_loader_dlopen(filename, flags, caller_addr);
-  if (result != NULL) {
-    char *traced_filename = (char *)malloc(MAXPATHLEN);
-    // FIXME: strncpy
-    strcpy(traced_filename, filename);
-    INFO_LOG("[-] dlopen handle: %s", filename);
-    traced_dlopen_handle_list.insert(std::make_pair(result, (const char *)traced_filename));
+  if (result != NULL && filename) {
+    char *traced_filename = safe_strdup(filename, MAXPATHLEN);
+    if (traced_filename) {
+      INFO_LOG("[-] dlopen handle: %s", filename);
+      traced_dlopen_handle_list.insert(std::make_pair(result, (const char *)traced_filename));
+    }
   }
   return result;
 }

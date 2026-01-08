@@ -66,10 +66,11 @@ PUBLIC inline int DobbyInstrument(void *address, dobby_instrument_callback_t pre
   routing->Active();
   entry->routing = routing;
 
-  if (routing->error) {
-    ERROR_LOG("build routing error.");
+  if (DOBBY_FAILED(routing->error)) {
+    ERROR_LOG("build routing error: %s", DobbyErrorString(routing->error));
+    DobbyError err = routing->error;
     delete entry; // This also deletes routing via Entry destructor
-    DOBBY_RETURN_ERROR(kDobbyErrorRoutingBuild);
+    DOBBY_RETURN_ERROR(err);
   }
 
   gInterceptor.add(entry);

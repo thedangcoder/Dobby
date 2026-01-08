@@ -14,6 +14,12 @@ PUBLIC int DobbyCodePatch(void *address, uint8_t *buffer, uint32_t buffer_size) 
     DOBBY_RETURN_ERROR(kDobbyErrorInvalidArgument);
   }
 
+  // Check for integer overflow: address + buffer_size
+  if ((uintptr_t)address > UINTPTR_MAX - buffer_size) {
+    ERROR_LOG("DobbyCodePatch: address + size overflow (address=%p, size=%u)", address, buffer_size);
+    DOBBY_RETURN_ERROR(kDobbyErrorInvalidArgument);
+  }
+
   int page_size = (int)sysconf(_SC_PAGESIZE);
   if (page_size <= 0) {
     ERROR_LOG("DobbyCodePatch: failed to get page size");

@@ -54,10 +54,8 @@ const stl::vector<MemRegion> &ProcessRuntime::getMemoryLayout(bool force_refresh
   if (fp == nullptr)
     return regions;
 
-  while (!feof(fp)) {
-    char line_buffer[LINE_MAX + 1];
-    fgets(line_buffer, LINE_MAX, fp);
-
+  char line_buffer[LINE_MAX + 1];
+  while (fgets(line_buffer, LINE_MAX, fp) != nullptr) {
     // ignore the rest of characters
     if (strlen(line_buffer) == LINE_MAX && line_buffer[LINE_MAX] != '\n') {
       // Entry not describing executable data. Skip to end of line to set up
@@ -153,10 +151,8 @@ static stl::vector<RuntimeModule> &get_process_map_with_proc_maps(bool force_ref
   if (fp == nullptr)
     return *modules;
 
-  while (!feof(fp)) {
-    char line_buffer[LINE_MAX + 1];
-    fgets(line_buffer, LINE_MAX, fp);
-
+  char line_buffer[LINE_MAX + 1];
+  while (fgets(line_buffer, LINE_MAX, fp) != nullptr) {
     // ignore the rest of characters
     if (strlen(line_buffer) == LINE_MAX && line_buffer[LINE_MAX] != '\n') {
       // Entry not describing executable data. Skip to end of line to set up
@@ -245,8 +241,10 @@ static stl::vector<RuntimeModule> get_process_map_with_linker_iterator() {
   dl_iterate_phdr_ptr(
       [](dl_phdr_info *info, size_t size, void *data) {
         RuntimeModule module = {0};
-        if (info->dlpi_name && info->dlpi_name[0] == '/')
-          strcpy(module.path, info->dlpi_name);
+        if (info->dlpi_name && info->dlpi_name[0] == '/') {
+          strncpy(module.path, info->dlpi_name, sizeof(module.path) - 1);
+          module.path[sizeof(module.path) - 1] = '\0';
+        }
 
         module.base = (void *)info->dlpi_addr;
         for (size_t i = 0; i < info->dlpi_phnum; ++i) {

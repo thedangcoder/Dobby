@@ -23,6 +23,19 @@
 
 std::unordered_map<int, const char *> *posix_file_descriptors;
 
+// Safe string copy with bounds checking
+static char *safe_strdup(const char *src, size_t max_len) {
+  if (!src) return nullptr;
+  size_t len = strlen(src);
+  if (len >= max_len) len = max_len - 1;
+  char *dst = (char *)malloc(len + 1);
+  if (dst) {
+    memcpy(dst, src, len);
+    dst[len] = '\0';
+  }
+  return dst;
+}
+
 int (*orig_open)(const char *pathname, int flags, ...);
 int fake_open(const char *pathname, int flags, ...) {
   mode_t mode = 0;
@@ -34,35 +47,33 @@ int fake_open(const char *pathname, int flags, ...) {
   }
 
   int result = orig_open(pathname, flags, mode);
-  if (result != -1) {
-    char *traced_filename = (char *)malloc(MAXPATHLEN);
-    // FIXME: strncpy
-    strcpy(traced_filename, pathname);
-    INFO_LOG("[-] trace open handle: %s", pathname);
+  if (result != -1 && pathname) {
+    char *traced_filename = safe_strdup(pathname, MAXPATHLEN);
+    if (traced_filename) {
+      INFO_LOG("[-] trace open handle: %s", pathname);
 
-    if (posix_file_descriptors == NULL) {
-      posix_file_descriptors = new std::unordered_map<int, const char *>();
+      if (posix_file_descriptors == NULL) {
+        posix_file_descriptors = new std::unordered_map<int, const char *>();
+      }
+      posix_file_descriptors->insert(std::make_pair(result, (const char *)traced_filename));
     }
-    posix_file_descriptors->insert(std::make_pair(result, (const char *)traced_filename));
   }
   return result;
 }
 
 int (*orig___open)(const char *pathname, int flags, int mode);
 int fake___open(const char *pathname, int flags, int mode) {
-  char *traced_filename = NULL;
-  if (pathname) {
-    traced_filename = (char *)malloc(MAXPATHLEN);
-    // FIXME: strncpy
-    strcpy(traced_filename, pathname);
-    INFO_LOG("[-] trace open handle: ", pathname);
-  }
   int result = orig___open(pathname, flags, mode);
-  if (result != -1) {
-    if (posix_file_descriptors == NULL) {
-      posix_file_descriptors = new std::unordered_map<int, const char *>();
+  if (result != -1 && pathname) {
+    char *traced_filename = safe_strdup(pathname, MAXPATHLEN);
+    if (traced_filename) {
+      INFO_LOG("[-] trace open handle: %s", pathname);
+
+      if (posix_file_descriptors == NULL) {
+        posix_file_descriptors = new std::unordered_map<int, const char *>();
+      }
+      posix_file_descriptors->insert(std::make_pair(result, (const char *)traced_filename));
     }
-    posix_file_descriptors->insert(std::make_pair(result, (const char *)traced_filename));
   }
   return result;
 }

@@ -5,6 +5,7 @@
 #include "MemoryAllocator.h"
 #include "PlatformUtil/ProcessRuntime.h"
 #include <stdint.h>
+#include <new>
 
 #define KB (1024uLL)
 #define MB (1024uLL * KB)
@@ -107,11 +108,25 @@ private:
       {
         auto page = OSMemory::Allocate(OSMemory::PageSize(), kNoAccess, unused_page);
         if (page != unused_page) {
-          FATAL_LOG("allocate unused page failed");
+          // Could not allocate at desired address, try next region
+          DEBUG_LOG("step-2 failed to allocate unused page at %p, got %p", unused_page, page);
+          if (page) {
+            OSMemory::Free(page, OSMemory::PageSize());
+          }
+          continue;
         }
-        OSMemory::SetPermission(unused_page, OSMemory::PageSize(), is_exec ? kReadExecute : kReadWrite);
+        if (!OSMemory::SetPermission(unused_page, OSMemory::PageSize(), is_exec ? kReadExecute : kReadWrite)) {
+          ERROR_LOG("step-2 failed to set permission on page %p", unused_page);
+          OSMemory::Free(unused_page, OSMemory::PageSize());
+          continue;
+        }
         DEBUG_LOG("step-2 unused page: %p", unused_page);
-        auto page_allocator = new simple_linear_allocator_t((uint8_t *)unused_page, OSMemory::PageSize());
+        auto page_allocator = new (std::nothrow) simple_linear_allocator_t((uint8_t *)unused_page, OSMemory::PageSize());
+        if (!page_allocator) {
+          ERROR_LOG("step-2 failed to allocate page_allocator");
+          OSMemory::Free(unused_page, OSMemory::PageSize());
+          continue;
+        }
         if (is_exec)
           code_page_allocators.push_back(page_allocator);
         else
