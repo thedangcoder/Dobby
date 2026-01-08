@@ -1,4 +1,5 @@
 #include "dobby/dobby_internal.h"
+#include "dobby/platform_mutex.h"
 
 #include <errno.h>
 #include <signal.h>
@@ -29,15 +30,40 @@
 #include "UnifiedInterface/platform-darwin/mach_vm.h"
 #include "PlatformUtil/ProcessRuntime.h"
 
+// Cache configuration
+static const int CACHE_TTL_MS = 100; // Cache valid for 100ms
+
+// Get current time in milliseconds
+static uint64_t get_time_ms() {
+  struct timeval tv;
+  gettimeofday(&tv, nullptr);
+  return (uint64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
 static bool memory_region_comparator(MemRegion a, MemRegion b) {
   return (a.addr() < b.addr());
 }
 
-stl::vector<MemRegion> *regions;
+static DobbyMutex g_regions_mutex;
+static stl::vector<MemRegion> *regions = nullptr;
+static uint64_t g_regions_cache_time = 0;
+static bool g_regions_cache_valid = false;
 
-const stl::vector<MemRegion> &ProcessRuntime::getMemoryLayout() {
+void ProcessRuntime::invalidateMemoryLayoutCache() {
+  DobbyLockGuard lock(g_regions_mutex);
+  g_regions_cache_valid = false;
+}
+
+const stl::vector<MemRegion> &ProcessRuntime::getMemoryLayout(bool force_refresh) {
+  DobbyLockGuard lock(g_regions_mutex);
   if (regions == nullptr) {
     regions = new stl::vector<MemRegion>();
+  }
+
+  // Check if cache is still valid
+  uint64_t now = get_time_ms();
+  if (!force_refresh && g_regions_cache_valid && (now - g_regions_cache_time) < CACHE_TTL_MS) {
+    return *regions;
   }
 
   regions->clear();
@@ -83,15 +109,35 @@ const stl::vector<MemRegion> &ProcessRuntime::getMemoryLayout() {
 
   // std::sort(ProcessMemoryLayout.begin(), ProcessMemoryLayout.end(), memory_region_comparator);
 
+  // Update cache timestamp
+  g_regions_cache_time = get_time_ms();
+  g_regions_cache_valid = true;
+
   return *regions;
 }
 
-static stl::vector<RuntimeModule> *modules;
+static DobbyMutex g_modules_mutex;
+static stl::vector<RuntimeModule> *modules = nullptr;
+static uint64_t g_modules_cache_time = 0;
+static bool g_modules_cache_valid = false;
 
-const stl::vector<RuntimeModule> &ProcessRuntime::getModuleMap() {
+void ProcessRuntime::invalidateModuleMapCache() {
+  DobbyLockGuard lock(g_modules_mutex);
+  g_modules_cache_valid = false;
+}
+
+const stl::vector<RuntimeModule> &ProcessRuntime::getModuleMap(bool force_refresh) {
+  DobbyLockGuard lock(g_modules_mutex);
   if (modules == nullptr) {
     modules = new stl::vector<RuntimeModule>();
   }
+
+  // Check if cache is still valid
+  uint64_t now = get_time_ms();
+  if (!force_refresh && g_modules_cache_valid && (now - g_modules_cache_time) < CACHE_TTL_MS) {
+    return *modules;
+  }
+
   modules->clear();
 
   kern_return_t kr;
@@ -126,6 +172,10 @@ const stl::vector<RuntimeModule> &ProcessRuntime::getModuleMap() {
   }
 
   modules->sort([](const RuntimeModule &a, const RuntimeModule &b) -> int { return a.base < b.base; });
+
+  // Update cache timestamp
+  g_modules_cache_time = get_time_ms();
+  g_modules_cache_valid = true;
 
   return *modules;
 }

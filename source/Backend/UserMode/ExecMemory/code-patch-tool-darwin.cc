@@ -16,7 +16,7 @@
   do {                                                                                                                 \
     if (kr != KERN_SUCCESS) {                                                                                          \
       ERROR_LOG("mach error: %s", mach_error_string(kr));                                                              \
-      return failure;                                                                                                  \
+      DOBBY_RETURN_ERROR(failure);                                                                                     \
     }                                                                                                                  \
   } while (0);
 
@@ -40,7 +40,7 @@ int mprotect_impl(void *addr, size_t len, int prot) {
 PUBLIC int DobbyCodePatch(void *address, uint8_t *buffer, uint32_t buffer_size) {
   if (address == nullptr || buffer == nullptr || buffer_size == 0) {
     ERROR_LOG("invalid argument");
-    return -1;
+    DOBBY_RETURN_ERROR(kDobbyErrorInvalidArgument);
   }
 
   size_t page_size = PAGE_SIZE;
@@ -52,7 +52,7 @@ PUBLIC int DobbyCodePatch(void *address, uint8_t *buffer, uint32_t buffer_size) 
     uint8_t *buffer_a = buffer;
     uint32_t buffer_size_a = (patch_page + page_size - (addr_t)address);
     auto ret = DobbyCodePatch(address_a, buffer_a, buffer_size_a);
-    if (ret == -1) {
+    if (DOBBY_FAILED(ret)) {
       return ret;
     }
 
@@ -105,7 +105,7 @@ PUBLIC int DobbyCodePatch(void *address, uint8_t *buffer, uint32_t buffer_size) 
     addr_t remap_dummy_page = 0;
     {
       kr = mach_vm_allocate(self_task, (mach_vm_address_t *)&remap_dummy_page, page_size, VM_FLAGS_ANYWHERE);
-      KERN_RETURN_ERROR(kr, -1);
+      KERN_RETURN_ERROR(kr, kDobbyErrorMemoryOperation);
 
       memcpy((void *)remap_dummy_page, (void *)patch_page, page_size);
 
@@ -113,31 +113,31 @@ PUBLIC int DobbyCodePatch(void *address, uint8_t *buffer, uint32_t buffer_size) 
       memcpy((void *)(remap_dummy_page + offset), buffer, buffer_size);
 
       kr = mach_vm_protect(self_task, remap_dummy_page, page_size, false, VM_PROT_READ | VM_PROT_EXECUTE);
-      KERN_RETURN_ERROR(kr, -1);
+      KERN_RETURN_ERROR(kr, kDobbyErrorMemoryOperation);
     }
 
     vm_prot_t prot, max_prot;
     kr = mach_vm_remap(self_task, (mach_vm_address_t *)&remap_dest_page, page_size, 0,
                        VM_FLAGS_OVERWRITE | VM_FLAGS_FIXED, self_task, remap_dummy_page, true, &prot, &max_prot,
                        VM_INHERIT_COPY);
-    KERN_RETURN_ERROR(kr, -1);
+    KERN_RETURN_ERROR(kr, kDobbyErrorMemoryOperation);
 
     kr = mach_vm_deallocate(self_task, remap_dummy_page, page_size);
-    KERN_RETURN_ERROR(kr, -1);
+    KERN_RETURN_ERROR(kr, kDobbyErrorMemoryOperation);
   } else {
     if (0) {
       {
         auto kr = mach_vm_allocate(self_task, &remap_dummy_page, page_size, VM_FLAGS_ANYWHERE);
-        KERN_RETURN_ERROR(kr, -1);
+        KERN_RETURN_ERROR(kr, kDobbyErrorMemoryOperation);
 
         kr = mach_vm_deallocate(self_task, remap_dummy_page, page_size);
-        KERN_RETURN_ERROR(kr, -1);
+        KERN_RETURN_ERROR(kr, kDobbyErrorMemoryOperation);
       }
 
       vm_prot_t prot, max_prot;
       kr = mach_vm_remap(self_task, &remap_dummy_page, page_size, 0, VM_FLAGS_ANYWHERE, self_task, remap_dest_page,
                          false, &prot, &max_prot, VM_INHERIT_SHARE);
-      KERN_RETURN_ERROR(kr, -1);
+      KERN_RETURN_ERROR(kr, kDobbyErrorMemoryOperation);
 
       kr = mach_vm_protect(self_task, remap_dummy_page, page_size, false, VM_PROT_READ | VM_PROT_WRITE);
       // the kr always return KERN_PROTECTION_FAILURE
@@ -156,16 +156,17 @@ PUBLIC int DobbyCodePatch(void *address, uint8_t *buffer, uint32_t buffer_size) 
     }
     {
       kr = vm_protect_fn(self_task, remap_dest_page, page_size, false, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
-      KERN_RETURN_ERROR(kr, -1);
+      KERN_RETURN_ERROR(kr, kDobbyErrorMemoryOperation);
 
       memcpy((void *)(patch_page + ((uint64_t)address - remap_dest_page)), buffer, buffer_size);
 
       kr = vm_protect_fn(self_task, remap_dest_page, page_size, false, VM_PROT_READ | VM_PROT_EXECUTE);
-      KERN_RETURN_ERROR(kr, -1);
+      KERN_RETURN_ERROR(kr, kDobbyErrorMemoryOperation);
     }
   }
 
   ClearCache(address, (void *)((addr_t)address + buffer_size));
 
-  return 0;
+  DobbySetLastError(kDobbySuccess);
+  return kDobbySuccess;
 }

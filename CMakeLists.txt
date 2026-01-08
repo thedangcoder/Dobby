@@ -158,6 +158,7 @@ set(dobby.SOURCE_FILE_LIST ${dobby.SOURCE_FILE_LIST}
 
   # main
   source/dobby.cpp
+  source/dobby/dobby_error.cc
   )
 
 

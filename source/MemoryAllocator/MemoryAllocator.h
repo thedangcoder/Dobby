@@ -60,20 +60,53 @@ struct MemBlock : MemRange {
 using CodeMemBlock = MemBlock;
 using DataMemBlock = MemBlock;
 
+// Page info structure to track allocator and its backing memory
+struct PageAllocatorInfo {
+  linear_allocator_t *allocator;
+  void *page_base;
+  size_t page_size;
+  bool is_exec;
+
+  PageAllocatorInfo(linear_allocator_t *alloc, void *base, size_t size, bool exec)
+      : allocator(alloc), page_base(base), page_size(size), is_exec(exec) {}
+
+  bool contains(addr_t addr) const {
+    return addr >= (addr_t)page_base && addr < (addr_t)page_base + page_size;
+  }
+};
+
 struct MemoryAllocator {
   mutable DobbyMutex mutex;
-  stl::vector<simple_linear_allocator_t *> code_page_allocators;
-  stl::vector<simple_linear_allocator_t *> data_page_allocators;
+  stl::vector<PageAllocatorInfo> page_allocators;
 
   inline static MemoryAllocator *Shared();
 
-  // Note: Linear allocators don't support individual block freeing.
-  // This is a no-op but provided for API consistency.
-  // Memory is reclaimed when the allocator is destroyed.
+  // Find the allocator that contains the given address
+  PageAllocatorInfo *findAllocatorForAddress(addr_t addr) {
+    for (auto &info : page_allocators) {
+      if (info.contains(addr)) {
+        return &info;
+      }
+    }
+    return nullptr;
+  }
+
+  // Free a previously allocated memory block
+  // Memory is marked as free and can be reused by subsequent allocations
   void freeMemBlock(MemBlock block) {
-    // Linear allocator cannot free individual blocks
-    // Memory will be reused when pages are full and new ones allocated
-    (void)block;
+    if (block.addr() == 0 || block.size == 0) {
+      return;
+    }
+
+    DobbyLockGuard lock(mutex);
+
+    auto *info = findAllocatorForAddress(block.addr());
+    if (!info || !info->allocator) {
+      ERROR_LOG("freeMemBlock: address %p not found in any allocator", (void *)block.addr());
+      return;
+    }
+
+    info->allocator->free((uint8_t *)block.addr());
   }
 
   MemBlock allocMemBlock(size_t in_size, bool is_exec = true) {
@@ -90,11 +123,14 @@ struct MemoryAllocator {
     }
 
     uint8_t *result = nullptr;
-    auto &allocators = is_exec ? code_page_allocators : data_page_allocators;
-    for (auto allocator : allocators) {
-      result = (uint8_t *)allocator->alloc(in_size);
-      if (result)
-        break;
+
+    // Try existing allocators of the same type first
+    for (auto &info : page_allocators) {
+      if (info.is_exec == is_exec && info.allocator) {
+        result = info.allocator->alloc((uint32_t)in_size);
+        if (result)
+          break;
+      }
     }
 
     if (!result) {
@@ -111,20 +147,16 @@ struct MemoryAllocator {
         return {};
       }
 
-      auto page_allocator = new (std::nothrow) simple_linear_allocator_t((uint8_t *)page, OSMemory::PageSize());
+      auto page_allocator = new (std::nothrow) linear_allocator_t((uint8_t *)page, (uint32_t)OSMemory::PageSize());
       if (!page_allocator) {
         ERROR_LOG("allocMemBlock: failed to create page allocator");
         OSMemory::Free(page, OSMemory::PageSize());
         return {};
       }
 
-      if (is_exec)
-        code_page_allocators.push_back(page_allocator);
-      else
-        data_page_allocators.push_back(page_allocator);
+      page_allocators.push_back(PageAllocatorInfo(page_allocator, page, OSMemory::PageSize(), is_exec));
 
-      auto allocator = is_exec ? code_page_allocators.back() : data_page_allocators.back();
-      result = (uint8_t *)allocator->alloc(in_size);
+      result = page_allocator->alloc((uint32_t)in_size);
     }
 
     if (!result) {

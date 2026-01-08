@@ -20,9 +20,19 @@ struct MemRegion : MemRange {
 
 class ProcessRuntime {
 public:
-  static const stl::vector<MemRegion> &getMemoryLayout();
+  // Get memory layout (cached for performance, ~100ms TTL)
+  // @param force_refresh If true, ignores cache and re-reads from system
+  static const stl::vector<MemRegion> &getMemoryLayout(bool force_refresh = false);
 
-  static const stl::vector<RuntimeModule> &getModuleMap();
+  // Invalidate the memory layout cache
+  static void invalidateMemoryLayoutCache();
+
+  // Get module map (cached for performance, ~100ms TTL)
+  // @param force_refresh If true, ignores cache and re-reads from system
+  static const stl::vector<RuntimeModule> &getModuleMap(bool force_refresh = false);
+
+  // Invalidate the module map cache
+  static void invalidateModuleMapCache();
 
   static RuntimeModule getModule(const char *name);
 };

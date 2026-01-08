@@ -1,9 +1,11 @@
 #include "PlatformUtil/ProcessRuntime.h"
+#include "dobby/platform_mutex.h"
 
 #include <elf.h>
 #include <dlfcn.h>
 #include <link.h>
 #include <sys/mman.h>
+#include <time.h>
 
 #include <string>
 #include <string.h>
@@ -13,12 +15,39 @@
 
 #define LINE_MAX 2048
 
+// Cache configuration
+static const int CACHE_TTL_MS = 100; // Cache valid for 100ms
+
 static bool memory_region_comparator(MemRange a, MemRange b) {
   return (a.start() < b.start());
 }
 
-stl::vector<MemRegion> regions;
-const stl::vector<MemRegion> &ProcessRuntime::getMemoryLayout() {
+// Get current time in milliseconds
+static uint64_t get_time_ms() {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+static DobbyMutex g_regions_mutex;
+static stl::vector<MemRegion> regions;
+static uint64_t g_regions_cache_time = 0;
+static bool g_regions_cache_valid = false;
+
+void ProcessRuntime::invalidateMemoryLayoutCache() {
+  DobbyLockGuard lock(g_regions_mutex);
+  g_regions_cache_valid = false;
+}
+
+const stl::vector<MemRegion> &ProcessRuntime::getMemoryLayout(bool force_refresh) {
+  DobbyLockGuard lock(g_regions_mutex);
+
+  // Check if cache is still valid
+  uint64_t now = get_time_ms();
+  if (!force_refresh && g_regions_cache_valid && (now - g_regions_cache_time) < CACHE_TTL_MS) {
+    return regions;
+  }
+
   regions.clear();
 
   FILE *fp = fopen("/proc/self/maps", "r");
@@ -88,14 +117,37 @@ const stl::vector<MemRegion> &ProcessRuntime::getMemoryLayout() {
   std::sort(regions.begin(), regions.end(), memory_region_comparator);
 
   fclose(fp);
+
+  // Update cache timestamp
+  g_regions_cache_time = get_time_ms();
+  g_regions_cache_valid = true;
+
   return regions;
 }
 
-static stl::vector<RuntimeModule> *modules;
-static stl::vector<RuntimeModule> &get_process_map_with_proc_maps() {
+static DobbyMutex g_modules_mutex;
+static stl::vector<RuntimeModule> *modules = nullptr;
+static uint64_t g_modules_cache_time = 0;
+static bool g_modules_cache_valid = false;
+
+void ProcessRuntime::invalidateModuleMapCache() {
+  DobbyLockGuard lock(g_modules_mutex);
+  g_modules_cache_valid = false;
+}
+
+static stl::vector<RuntimeModule> &get_process_map_with_proc_maps(bool force_refresh) {
+  DobbyLockGuard lock(g_modules_mutex);
   if (modules == nullptr) {
     modules = new stl::vector<RuntimeModule>();
   }
+
+  // Check if cache is still valid
+  uint64_t now = get_time_ms();
+  if (!force_refresh && g_modules_cache_valid && (now - g_modules_cache_time) < CACHE_TTL_MS) {
+    return *modules;
+  }
+
+  modules->clear();
 
   FILE *fp = fopen("/proc/self/maps", "r");
   if (fp == nullptr)
@@ -172,6 +224,11 @@ static stl::vector<RuntimeModule> &get_process_map_with_proc_maps() {
   }
 
   fclose(fp);
+
+  // Update cache timestamp
+  g_modules_cache_time = get_time_ms();
+  g_modules_cache_valid = true;
+
   return *modules;
 }
 
@@ -211,12 +268,12 @@ static stl::vector<RuntimeModule> get_process_map_with_linker_iterator() {
 }
 #endif
 
-const stl::vector<RuntimeModule> &ProcessRuntime::getModuleMap() {
+const stl::vector<RuntimeModule> &ProcessRuntime::getModuleMap(bool force_refresh) {
 #if defined(__LP64__) && 0
   // TODO: won't resolve main binary
   return get_process_map_with_linker_iterator();
 #else
-  return get_process_map_with_proc_maps();
+  return get_process_map_with_proc_maps(force_refresh);
 #endif
 }
 

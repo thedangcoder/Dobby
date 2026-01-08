@@ -19,7 +19,7 @@ PUBLIC int DobbyDestroy(void *address) {
   __FUNC_CALL_TRACE__();
   if (!address) {
     ERROR_LOG("address is 0x0");
-    return -1;
+    DOBBY_RETURN_ERROR(kDobbyErrorInvalidArgument);
   }
 
   features::arm_thumb_fix_addr(address);
@@ -30,10 +30,11 @@ PUBLIC int DobbyDestroy(void *address) {
     gInterceptor.remove((addr_t)address);
     entry->restore_orig_code();
     delete entry;
-    return 0;
+    DobbySetLastError(kDobbySuccess);
+    return kDobbySuccess;
   }
 
-  return -1;
+  DOBBY_RETURN_ERROR(kDobbyErrorNotFound);
 }
 
 PUBLIC void dobby_set_options(bool enable_near_trampoline, dobby_alloc_near_code_callback_t alloc_near_code_callback) {
@@ -49,4 +50,12 @@ PUBLIC uintptr_t placeholder() {
   x += (uintptr_t)&common_closure_bridge_handler;
   x += (uintptr_t)&dobby_register_alloc_near_code_callback;
   return x;
+}
+
+#ifndef __DOBBY_BUILD_VERSION__
+#define __DOBBY_BUILD_VERSION__ "Dobby-unknown"
+#endif
+
+PUBLIC const char *DobbyGetVersion() {
+  return __DOBBY_BUILD_VERSION__;
 }

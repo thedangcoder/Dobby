@@ -44,7 +44,7 @@ PUBLIC inline int DobbyInstrument(void *address, dobby_instrument_callback_t pre
   __FUNC_CALL_TRACE__();
   if (!address) {
     ERROR_LOG("address is 0x0.");
-    return -1;
+    DOBBY_RETURN_ERROR(kDobbyErrorInvalidArgument);
   }
 
   features::apple::arm64e_pac_strip(address);
@@ -54,8 +54,8 @@ PUBLIC inline int DobbyInstrument(void *address, dobby_instrument_callback_t pre
 
   auto entry = gInterceptor.find((addr_t)address);
   if (entry) {
-    ERROR_LOG("%s already been instrumented.", address);
-    return -1;
+    ERROR_LOG("%p already been instrumented.", address);
+    DOBBY_RETURN_ERROR(kDobbyErrorAlreadyExists);
   }
 
   entry = new Interceptor::Entry((addr_t)address);
@@ -69,10 +69,11 @@ PUBLIC inline int DobbyInstrument(void *address, dobby_instrument_callback_t pre
   if (routing->error) {
     ERROR_LOG("build routing error.");
     delete entry; // This also deletes routing via Entry destructor
-    return -1;
+    DOBBY_RETURN_ERROR(kDobbyErrorRoutingBuild);
   }
 
   gInterceptor.add(entry);
 
-  return 0;
+  DobbySetLastError(kDobbySuccess);
+  return kDobbySuccess;
 }

@@ -31,7 +31,7 @@ PUBLIC inline int DobbyHook(void *address, void *fake_func, void **out_origin_fu
   __FUNC_CALL_TRACE__();
   if (!address) {
     ERROR_LOG("address is 0x0");
-    return -1;
+    DOBBY_RETURN_ERROR(kDobbyErrorInvalidArgument);
   }
 
   features::apple::arm64e_pac_strip(address);
@@ -43,7 +43,7 @@ PUBLIC inline int DobbyHook(void *address, void *fake_func, void **out_origin_fu
   auto entry = gInterceptor.find((addr_t)address);
   if (entry) {
     ERROR_LOG("%p already been hooked.", address);
-    return -1;
+    DOBBY_RETURN_ERROR(kDobbyErrorAlreadyExists);
   }
 
   entry = new Interceptor::Entry((addr_t)address);
@@ -57,7 +57,7 @@ PUBLIC inline int DobbyHook(void *address, void *fake_func, void **out_origin_fu
   if (routing->error) {
     ERROR_LOG("build routing error.");
     delete entry; // This also deletes routing via Entry destructor
-    return -1;
+    DOBBY_RETURN_ERROR(kDobbyErrorRoutingBuild);
   }
 
   if (out_origin_func) {
@@ -67,5 +67,6 @@ PUBLIC inline int DobbyHook(void *address, void *fake_func, void **out_origin_fu
 
   gInterceptor.add(entry);
 
-  return 0;
+  DobbySetLastError(kDobbySuccess);
+  return kDobbySuccess;
 }
