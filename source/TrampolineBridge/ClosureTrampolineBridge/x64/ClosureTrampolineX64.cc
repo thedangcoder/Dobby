@@ -10,8 +10,10 @@
 using namespace zz;
 using namespace zz::x64;
 
+#if defined(BUILD_WITH_TRAMPOLINE_ASM)
 extern "C" void closure_trampoline_asm();
 extern "C" void closure_trampoline_asm_end();
+#endif
 
 ClosureTrampoline *GenerateClosureTrampoline(void *carry_data, void *carry_handler) {
   auto closure_tramp = new ClosureTrampoline(CLOSEURE_TRAMPOLINE_X64, CodeMemBlock{}, carry_data, carry_handler);
@@ -20,7 +22,7 @@ ClosureTrampoline *GenerateClosureTrampoline(void *carry_data, void *carry_handl
     closure_bridge_init();
   }
 
-#if !defined(BUILD_WITH_TRAMPOLINE_ASSEMBLER) || defined(BUILD_WITH_TRAMPOLINE_ASM)
+#if defined(BUILD_WITH_TRAMPOLINE_ASM)
   auto closure_trampoline_asm_end_addr = (addr_t)closure_trampoline_asm_end;
   auto closure_trampoline_asm_addr = (addr_t)closure_trampoline_asm;
 
@@ -53,7 +55,7 @@ ClosureTrampoline *GenerateClosureTrampoline(void *carry_data, void *carry_handl
 
   _ relocDataLabels();
 
-  auto tramp_code_block =
+  auto tramp_block =
       AssemblerCodeBuilder::FinalizeFromTurboAssembler(static_cast<AssemblerBase *>(&turbo_assembler_));
 #endif
 

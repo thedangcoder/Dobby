@@ -10,13 +10,15 @@
 using namespace zz;
 using namespace zz::x64;
 
+#if defined(BUILD_WITH_TRAMPOLINE_ASM)
 extern "C" void closure_bridge_asm();
+#endif
 
 void closure_bridge_init() {
   __FUNC_CALL_TRACE__();
 
 // Check if enable the inline-assembly closure_bridge_template
-#if !defined(BUILD_WITH_TRAMPOLINE_ASSEMBLER) || defined(BUILD_WITH_TRAMPOLINE_ASM)
+#if defined(BUILD_WITH_TRAMPOLINE_ASM)
   closure_bridge_addr = (asm_func_t)closure_bridge_asm;
 #else
   // otherwise, use the Assembler build the closure_bridge
