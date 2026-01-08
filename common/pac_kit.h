@@ -4,6 +4,11 @@
 #include <sys/types.h>
 #include <stddef.h>
 
+// __has_feature is a Clang-specific extension, define fallback for other compilers
+#ifndef __has_feature
+#define __has_feature(x) 0
+#endif
+
 #if defined(__arm64e__) || __has_feature(ptrauth_calls)
 #include <ptrauth.h>
 #endif

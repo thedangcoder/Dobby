@@ -1,10 +1,30 @@
-FROM ubuntu:focal
+FROM ubuntu:22.04
 
-ARG DEBIAN_FRONTEND='noninteractive'
+ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt-key adv --keyserver 'keyserver.ubuntu.com' --recv-key 'C99B11DEB97541F0' &&
-  apt-add-repository -y -u 'https://cli.github.com/packages' &&
-  apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main'
+# Install base dependencies
+RUN apt-get update && apt-get install -y \
+    apt-utils \
+    binutils \
+    build-essential \
+    cmake \
+    curl \
+    wget \
+    unzip \
+    make \
+    git \
+    python3 \
+    ninja-build \
+    gcc \
+    g++ \
+    libc6-dev \
+    gcc-arm-linux-gnueabihf \
+    g++-arm-linux-gnueabihf \
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
+    && rm -rf /var/lib/apt/lists/*
 
-ADD setup_linux_cross_compile.sh /root/setup_linux_cross_compile.sh
-RUN sh /root/setup_linux_cross_compile.sh
+WORKDIR /workspace
+
+# Default command - build for Linux
+CMD ["sh", "-c", "python3 scripts/platform_builder.py --platform=linux --arch=all"]
