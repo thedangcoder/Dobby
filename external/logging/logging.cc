@@ -27,9 +27,14 @@
 
 #if defined(_WIN32)
 #define PUBLIC
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <winsock2.h> // for timeval
-// Windows gettimeofday implementation
+// Windows timeval and gettimeofday implementation
+struct win_timeval {
+  long tv_sec;
+  long tv_usec;
+};
+#define timeval win_timeval
 static int gettimeofday(struct timeval *tv, void *tz) {
   FILETIME ft;
   GetSystemTimeAsFileTime(&ft);
