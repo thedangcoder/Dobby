@@ -8,7 +8,16 @@
 #include "MemoryAllocator/NearMemoryAllocator.h"
 #include <stdint.h>
 
-__attribute__((constructor)) static void ctor() {
+#if defined(_MSC_VER)
+// MSVC: Use CRT initialization
+#pragma section(".CRT$XCU", read)
+static void __cdecl ctor(void);
+__declspec(allocate(".CRT$XCU")) static void(__cdecl *ctor_ptr)(void) = ctor;
+static void __cdecl ctor(void)
+#else
+__attribute__((constructor)) static void ctor()
+#endif
+{
   DEBUG_LOG("================================");
   DEBUG_LOG("Dobby");
   DEBUG_LOG("dobby in debug log mode, disable with cmake flag \"-DDOBBY_DEBUG=OFF\"");
