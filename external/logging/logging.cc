@@ -27,6 +27,22 @@
 
 #if defined(_WIN32)
 #define PUBLIC
+#include <windows.h>
+// Windows gettimeofday implementation
+struct timeval {
+  long tv_sec;
+  long tv_usec;
+};
+static int gettimeofday(struct timeval *tv, void *tz) {
+  FILETIME ft;
+  GetSystemTimeAsFileTime(&ft);
+  unsigned long long t = ((unsigned long long)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+  t -= 116444736000000000ULL; // Convert to Unix epoch
+  t /= 10; // Convert to microseconds
+  tv->tv_sec = (long)(t / 1000000);
+  tv->tv_usec = (long)(t % 1000000);
+  return 0;
+}
 #else
 #define PUBLIC __attribute__((visibility("default")))
 #define INTERNAL __attribute__((visibility("internal")))
