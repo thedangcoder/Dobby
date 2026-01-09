@@ -1,0 +1,116 @@
+name: Build
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        arch: [x86, x86_64, arm, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build
+          if [ "${{ matrix.arch }}" = "arm" ]; then
+            sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+          elif [ "${{ matrix.arch }}" = "arm64" ]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          elif [ "${{ matrix.arch }}" = "x86" ]; then
+            sudo apt-get install -y gcc-multilib g++-multilib
+          fi
+
+      - name: Build
+        run: python3 scripts/platform_builder.py --platform=linux --arch=${{ matrix.arch }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dobby-linux-${{ matrix.arch }}
+          path: build/linux/${{ matrix.arch }}/
+
+  build-android:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        arch: [armeabi-v7a, arm64-v8a, x86, x86_64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26b
+
+      - name: Build
+        run: python3 scripts/platform_builder.py --platform=android --arch=${{ matrix.arch }} --android_ndk_dir=${{ steps.setup-ndk.outputs.ndk-path }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dobby-android-${{ matrix.arch }}
+          path: build/android/${{ matrix.arch }}/
+
+  build-macos:
+    runs-on: macos-14
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: python3 scripts/platform_builder.py --platform=macos --arch=${{ matrix.arch }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dobby-macos-${{ matrix.arch }}
+          path: build/macos/${{ matrix.arch }}/
+
+  build-ios:
+    runs-on: macos-14
+    strategy:
+      matrix:
+        arch: [arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: python3 scripts/platform_builder.py --platform=iphoneos --arch=${{ matrix.arch }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dobby-ios-${{ matrix.arch }}
+          path: build/iphoneos/${{ matrix.arch }}/
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build
+        run: |
+          mkdir build-win
+          cd build-win
+          cmake .. -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --target dobby_static
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dobby-windows-x64
+          path: build-win/*.lib
