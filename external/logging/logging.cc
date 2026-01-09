@@ -28,11 +28,8 @@
 #if defined(_WIN32)
 #define PUBLIC
 #include <windows.h>
+#include <winsock2.h> // for timeval
 // Windows gettimeofday implementation
-struct timeval {
-  long tv_sec;
-  long tv_usec;
-};
 static int gettimeofday(struct timeval *tv, void *tz) {
   FILETIME ft;
   GetSystemTimeAsFileTime(&ft);
