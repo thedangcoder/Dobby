@@ -150,8 +150,6 @@ class AndroidPlatformBuilder(PlatformBuilder):
     self.static_output_name = "libdobby.a"
 
     android_api_level = 21
-    if arch == "armeabi-v7a" or arch == "x86":
-      android_api_level = 19
 
     # Remove compiler args - Android NDK toolchain handles this automatically
     self.cmake_args = [arg for arg in self.cmake_args if not arg.startswith("-DCMAKE_C_COMPILER") and not arg.startswith("-DCMAKE_CXX_COMPILER")]

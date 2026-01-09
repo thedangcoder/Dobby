@@ -282,7 +282,7 @@ typedef struct {
  *
  * @param name Base name for the hook (creates fake_##name and orig_##name)
  * @param fn_ret_t Return type of the hooked function
- * @param fn_args_t... Argument types of the hooked function
+ * @param ... Argument types of the hooked function
  *
  * @code
  * install_hook_name(malloc, void*, size_t size) {
@@ -294,15 +294,15 @@ typedef struct {
  * install_hook_malloc(malloc_addr);
  * @endcode
  */
-#define install_hook_name(name, fn_ret_t, fn_args_t...)                        \
-  static fn_ret_t fake_##name(fn_args_t);                                      \
-  static fn_ret_t (*orig_##name)(fn_args_t);                                   \
+#define install_hook_name(name, fn_ret_t, ...)                                 \
+  static fn_ret_t fake_##name(__VA_ARGS__);                                    \
+  static fn_ret_t (*orig_##name)(__VA_ARGS__);                                 \
   /* __attribute__((constructor)) */                                           \
   static void install_hook_##name(void *sym_addr) {                            \
     DobbyHook(sym_addr, (void *)fake_##name, (void **)&orig_##name);           \
     return;                                                                    \
   }                                                                            \
-  fn_ret_t fake_##name(fn_args_t)
+  fn_ret_t fake_##name(__VA_ARGS__)
 
 /* ============================================================================
  * Core API Functions
