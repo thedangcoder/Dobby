@@ -15,14 +15,14 @@ static uint64_t get_time_ms() {
   return GetTickCount64();
 }
 
-static bool memory_region_comparator(MemRange a, MemRange b) {
-  return (a.address > b.address);
+static bool memory_region_comparator(MemRegion a, MemRegion b) {
+  return (a.start() < b.start());
 }
 
 // https://gist.github.com/jedwardsol/9d4fe1fd806043a5767affbd200088ca
 
 static DobbyMutex g_memory_layout_mutex;
-static stl::vector<MemRange> ProcessMemoryLayout;
+static stl::vector<MemRegion> ProcessMemoryLayout;
 static uint64_t g_memory_layout_cache_time = 0;
 static bool g_memory_layout_cache_valid = false;
 
@@ -31,7 +31,7 @@ void ProcessRuntime::invalidateMemoryLayoutCache() {
   g_memory_layout_cache_valid = false;
 }
 
-stl::vector<MemRange> ProcessRuntime::getMemoryLayout(bool force_refresh) {
+const stl::vector<MemRegion> &ProcessRuntime::getMemoryLayout(bool force_refresh) {
   DobbyLockGuard lock(g_memory_layout_mutex);
 
   // Check if cache is still valid
@@ -74,7 +74,7 @@ stl::vector<MemRange> ProcessRuntime::getMemoryLayout(bool force_refresh) {
       break;
     }
 
-    ProcessMemoryLayout.push_back(MemRange{(void *)region.BaseAddress, region.RegionSize, permission});
+    ProcessMemoryLayout.push_back(MemRegion((addr_t)region.BaseAddress, region.RegionSize, permission));
   }
 
   // Update cache timestamp
@@ -94,7 +94,7 @@ void ProcessRuntime::invalidateModuleMapCache() {
   g_module_map_cache_valid = false;
 }
 
-stl::vector<RuntimeModule> ProcessRuntime::getModuleMap(bool force_refresh) {
+const stl::vector<RuntimeModule> &ProcessRuntime::getModuleMap(bool force_refresh) {
   DobbyLockGuard lock(g_module_map_mutex);
 
   // Check if cache is still valid
@@ -113,7 +113,7 @@ stl::vector<RuntimeModule> ProcessRuntime::getModuleMap(bool force_refresh) {
 }
 
 RuntimeModule ProcessRuntime::getModule(const char *name) {
-  stl::vector<RuntimeModule> modules = getModuleMap();
+  const stl::vector<RuntimeModule> &modules = getModuleMap();
   for (auto module : modules) {
     if (strstr(module.path, name) != 0) {
       return module;
